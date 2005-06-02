@@ -1,0 +1,70 @@
+= Part I - Introduction
+
+First of all, I must say I lied. I do know a bit:
+
+* Naive functional programming
+* Primitive haskell
+* X86 Assembley
+* Stack based state machines
+
+What I don't know:
+
+* Thinking in Haskell
+** Monads
+** Structure
+* Thinking in Forth
+* Parrot's Assembley
+
+I plan to touch on the things that I do know, but I don't think I can introduce
+them that well. Instead I'll point you to some tutorials, and hope for the
+best, while trying to provide half hearted introductions to not-yet-discussed
+concepts.
+
+I do want to keep this short and sweet, though.
+
+== The Plan
+
+Our Forth compiler will be based around some ideas from the Pugs project.
+
+=== The parser
+
+We will write a parser that creates an AST with Parsec. This will teach us how
+to design an AST, and how to write Parsec parsers to generate our AST.
+
+=== The evaluator
+
+We will write an evaluator for that AST in Haskell. This will teach us about
+monadic constructs, avoiding lazyness, structures for the interpretation,
+interaction with the real world, and meta-language way of thought.
+
+=== GADT
+
+We will validate the AST with GADT, to learn GADT and to check the correctness of compiled forth programs.
+
+=== Pretty printing
+
+We will pretty print parrot code from the AST, and possibly other languages
+later. This will test our code's interoperability, and teach us Parrot.
+
+=== Embedding
+
+We will embed parrot later, to encapsulate the process in one command. This
+will teach us some parrot APIs, and haskell constructs.
+
+=== Optimization
+
+We will try to optimize the AST, and the pretty printed code. Forth is
+notoriously optimizable. This should be a test for our design, and abilities.
+
+= Summary
+
+Writing these words, and commiting them to darcs, I've yet to write a single
+line of code.
+
+I hope the plan will change, and that the only things I will go back in time
+for are grammarical corrections and the likes.
+
+The tutorial is supposed to track my thoughts - a sort of journal, but not in
+journal format.
+
+Wish me luck!

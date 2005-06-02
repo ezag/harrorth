@@ -93,3 +93,13 @@ string we just parsed. `return` is the way to insert our `Exp` into the Parser
 monad. We need this because otherwise our parser for new words is not a part of
 the Parser monad, and cannot mean anything to Parsec.
 
+== Playing with the parser
+
+This is the fun part:
+
+	% ghci -issrc src/Harrorth/Parser.hs
+	*Harrorth.Parser> parseTest forthProgram "2 foo : bar 4 blah ; ding"
+	[Push 2,Invoke "foo",NewWord "bar" [Push 4,Invoke "blah"],Invoke "ding"]
+
+WOOO!
+

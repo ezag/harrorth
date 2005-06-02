@@ -1,6 +1,42 @@
 = Part I - Introduction
 
-First of all, I must say I lied. I do know a bit:
+== Rationale
+
+Please read the README file - it's short and to the point.
+
+If you're too lazy:
+
+* I don't know haskell, forth or parrot
+* I am going to write a forth to parrot compiler in haskell
+* I hope it will teach me all three
+* I hope I can document how I got there in this tutorial.
+
+== The Benefits
+
+What I hope to get of the three languages:
+
+* Haskell
+** Monads
+*** IO
+**** Interactive
+**** Files
+*** Storage
+** Tools
+*** Parsec
+*** GADT
+*** C code embedding
+**** of parrot
+* Forth
+** The concept in general
+* Parrot
+** The details
+*** PMC implementations
+*** builtin ops
+*** general usage
+
+== What I Do Know
+
+First of all, I must say I lied in the README. I do know a bit:
 
 * Naive functional programming
 * Primitive haskell

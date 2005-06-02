@@ -1,0 +1,11 @@
+= Parsing forth.
+
+Rational thinking leads me to believe that I need to know forth to parse.
+Googling for `forth tutorial` yielded
+http://home.tampabay.rr.com/jforth/C04_Tutorial_Beginning.html.
+
+Using the documentation found on
+http://www.cs.uu.nl/~daan/download/parsec/parsec.html we will try to define our
+initial grammar.
+
+

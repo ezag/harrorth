@@ -7,3 +7,9 @@ Going to try learn some Forth, to see how the AST should look.
 Googling for `forth tutorial`.
 
 Reading http://home.tampabay.rr.com/jforth/C04_Tutorial_Beginning.html
+
+== Parsec
+
+AST defined, going to try to parse forth into it
+
+Parser done!

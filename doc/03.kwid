@@ -1,0 +1,95 @@
+= Parsing strings into the AST
+
+We defined a representation of what a Forth program looks like. The AST is just
+a bit of data that is easier to manipulate than strings.
+
+On the other hand Forth programs are just strings.
+
+The process to convert from strings to ASTs is not very trivial though,
+otherwise no one would care for ASTs.
+
+Writing grammars, on the other hand, is rather simple. Grammars are a
+description of how a string is allowed to be shaped, and they also embed code
+to create an AST by matching parts of the grammar.
+
+Haskell has a library for a very simple style of parsing, called Parsec. Lets
+look at `src/Harrorth/Parser.hs`, and see what we can make of it.
+
+First and foremost we see two `import` clauses. These give us the Parsec api,
+and the AST we defined in the previous chapter.
+
+Next we see the definition of a parser for a forth program. This is where the
+"simple" part comes in - Parsec is a parser combinator library. We define the
+parser for a forth program by combining to parsers:
+
+* A parser for forth expressions
+* A parser for eof
+
+It's type is `forthProgram :: Parser Forth`, btw. It's a function that returns
+the type `Forth` (recall, `[Exp]`), within the Parser monad.
+
+The combination process is provided by the Parser monadic bind operator. Do
+notation, as you can see mentioned in a billion and one monad tutorials, is
+just short hand for glueing stuff together with monadic binds.
+
+What do notation gives us in this definition is the ability to parse some forth
+code, extract the result of that into a variable called `ast` and then parse an
+end of input.
+
+The Parser monad makes sure that the combination of `forth` and `eof` works
+out.
+
+`eof` is a builtin parser, and it should be easy to guess what it does ;-).
+Let's look at `forth` instead:
+
+	forth :: Parser Forth
+	forth = sepEndBy forthExp sep
+
+It, like `forthProgram` returns a `Forth`. It uses `sepEndBy` to parse a series
+of `forthExp`s, separated by `sep`. `sep` is just white space, thrown away.
+
+`forthExp` is of type `Parser Exp`, meaning that it returns `Exp`s in the
+parser monad. Recall that an `Exp` is either a definition of a word, a literal,
+or a word. `forthExp` uses Parsec's `<|>` operator to denote alternatives.
+
+The last thing we will look at is `newWord`. You should be able to figure the
+rest out for yourself. `newWord` takes the definition of a forth word, which
+looks like
+
+	: foo bar ;
+
+meaning that `foo` is now defined to be `bar`. Lets examine it:
+
+	newWord :: Parser Exp
+	newWord = do
+		char ':'
+		maybeSep
+		name <- wordName
+		sep
+		body <- forth
+		maybeSep
+		char ';'
+		return $ NewWord name body
+
+First it matches a single colon, then an optional separator, then a wordName -
+just some letters. It extracts the name and puts it into a variable. After that
+it matches a separator, and then the body of the definition - some forth code!
+
+We put the AST we parsed from the body of the definition into `body`, and then
+match the closing semicolon. The thing `newWord` returns is a `data Exp`. We'll
+need to use one of `Exp`s constructors to return it. Since it returns the
+expression to define a new word, we'll use the `NewWord` constructor, which
+takes a name and a definition:
+
+	return $ NewWord name body
+
+The '$' means that everything on the right of it is a single value. It can be
+read like this:
+
+	return (NewWord name body)
+
+So `NewWord name body` creates a new `Exp`, with the data we extracted from the
+string we just parsed. `return` is the way to insert our `Exp` into the Parser
+monad. We need this because otherwise our parser for new words is not a part of
+the Parser monad, and cannot mean anything to Parsec.
+

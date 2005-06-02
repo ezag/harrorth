@@ -1,11 +1,114 @@
-= Parsing forth.
+= Representing Forth In Memory
 
 Rational thinking leads me to believe that I need to know forth to parse.
 Googling for `forth tutorial` yielded
 http://home.tampabay.rr.com/jforth/C04_Tutorial_Beginning.html.
 
-Using the documentation found on
-http://www.cs.uu.nl/~daan/download/parsec/parsec.html we will try to define our
-initial grammar.
+Superficially it looks like there are three things that can happen in a forth
+program:
 
+* A new word is defined
+* Some literal is pushed onto the stack
+* A word gets called
+
+Lets do an example:
+
+	1
+
+That forth program just pushed the literal 1 onto the stack. Whoopee!
+
+	2 3 DUP
+
+That forth program put 2 on the stack, then put 3 on the stack, and then called
+the word `DUP`. `DUP`'s job is to take the stack head, and duplicate it. The
+program
+
+	2 3 3
+
+has the same outcome as
+
+	2 3 DUP
+
+Now lets define a very stupid word:
+
+	: TWO.THREES 3 DUP ;
+
+This word when invoked:
+
+	2 TWO.THREES
+
+Will have the same effect as `2 3 3`, since `TWO.THREES` was defined to be the
+expressions `3 DUP`.
+
+`src/Harrorth/AST.hs` is a prelimenary definition of what a forth program can
+look like.
+
+First we are defining what a forth program is:
+
+	`type Forth = [Exp]`
+
+This means that `Forth`, a type, is a list of `Exp`, expressions. In a sense
+writing `Forth` is shorthand for writing `[Exp]`.
+
+Next we have the data type `Exp`. A data type is the definition of a thing that
+can be passed around. For example an `Integer` is a data type, and `3` is a
+thing, whose type is `Integer`. An expression is one of three things in our AST:
+
+	data Exp
+		= Invoke Word
+		| Push Literal
+		| NewWord Word Forth
+
+It is either an invocation of a word, the pushing of a literal onto the stack,
+or the definition of a new word.
+
+`Invoke` `Push` and `NewWord` are data constructors. They are functions which
+return a thing of type `Exp`.
+
+The constructor `Invoke` takes a single parameter, of type `Word` (later
+defined as `type Word = String`). How it actually contains the Word is beyond
+us - haskell does that automatically.
+
+The `NewWord` constructor is a somewhat more interesting example: it bundles a
+`Word` and some `Forth` into a single `Exp`. Recall that `Forth` is really just
+a list of `Exps`.
+
+Lets represent the AST for this program:
+
+	2
+	4
+	SWAP
+	: FOO
+		3
+		SWAP
+	;
+	FOO
+
+I put an expression on each line, and indented the nested `NewWord` expression
+so that the structure is clear.
+
+Writing this as haskell types with our AST, instead of forth source, would look
+like (single line broken in two):
+
+	[ Push 2, Push 4, Invoke "SWAP", NewWord "FOO"
+	[ Push 3, Invoke "SWAP" ], Invoke "FOO" ]
+
+Since the source contains the line `deriving Show` in the definition of
+`data Exp`, haskell will make an effort to print anything of type `Forth` for
+us.
+
+`Show` is a type class. Any type that can be /shown/, i.e. be converted into a
+string, can belong to that class. What `deriving` means is that we're too lazy
+to say how we want `Exp` to `Show`. Fortunately our Haskell compiler can do it
+for us.  Try this in the Harrorth directory:
+
+	% ghci src/Harrorth/AST.hs
+	*Harrorth.AST> Invoke "FOO"
+	Invoke "FOO"
+	*Harrorth.AST> [ Invoke "FOO", Push 3 ]
+	[Invoke "FOO",Push 3]
+
+you can see that it will just reprint what we gave it. Haskell knows how to
+print constructor names, strings, lists and integers on it's own, and that's
+really all we used to represent a forth program in memory.
 

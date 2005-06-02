@@ -1,0 +1,37 @@
+Harrorth - Learning Haskell, Forth and Parrot - Together.
+
+This project is an auto-didactic experiment about trying to learn three
+languages, for the sole purpose of learning the three languages.
+
+It is documented in a tutorial like structure, following the actual process of
+the author. In short - I can assume nothing in the begining, because I really
+didn't know at the time it was written.
+
+The excercise driving will be implementing a Forth parser, compiler, and
+evaluator in Hsakell, and later having this compiler target Parrot.
+
+What I hope to get of the three languages:
+
+	- Haskell
+		- Monads
+			- IO
+				- Interactive
+				- Files
+			- Storage
+		- Tools
+			- Parsec
+			- GADT
+			- C code embedding
+				- of parrot
+	- Forth
+		- The concept in general
+	- Parrot
+		- The details
+			- PMC implementations
+			- builtin ops
+			- general usage
+
+This project was started out of the frustration of learning haskell in theory.
+It is my firm belief, as I write this, that I will get nowhere with haskell
+without a real project to drive me.
+

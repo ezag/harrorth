@@ -27,3 +27,9 @@ Gave more background, more context
 complete def of AST, discussion of type constructors, pattern matching, and
 type classes.
 
+=== docs/03.kwid
+
+Cover full parser source
+
+try to explain monadic bind better
+

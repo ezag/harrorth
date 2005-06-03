@@ -1,9 +1,18 @@
-= Parsing strings into the AST
+= Parsing Forth
+
+== Parsing = String -> AST
 
 We defined a representation of what a Forth program looks like. The AST is just
 a bit of data that is easier to manipulate than strings.
 
-On the other hand Forth programs are just strings.
+Both strings (i.e., files or snippets of Forth code) and the AST represent
+forth programs that can be executed.
+
+The reason we have both is these humans involved in programming.
+
+Forth programmers don't like writing ASTs - it's tedious, and annoying.
+Compiler writers on the other hand don't like manipulating strings - it's
+tricky, error prone, and tends to mix content and representation too much.
 
 The process to convert from strings to ASTs is not very trivial though,
 otherwise no one would care for ASTs.
@@ -15,29 +24,94 @@ to create an AST by matching parts of the grammar.
 Haskell has a library for a very simple style of parsing, called Parsec. Lets
 look at `src/Harrorth/Parser.hs`, and see what we can make of it.
 
-First and foremost we see two `import` clauses. These give us the Parsec api,
-and the AST we defined in the previous chapter.
+== Introducing Parsec
+
+Parsec is a monadic parser combinator library. Sounds tough? It's those
+properties that make it fun to use. Lets see what they mean by writing our
+parser.
+
+== `src/Harrorth/Parser.hs`
+
+First and foremost we declare that this file provides the module
+`Harrorth.Parser`. Next we see two `import` clauses. These give us the Parsec
+api, and the AST we defined in the previous chapter.
+
+	module Harrorth.Parser where
+
+	import Text.ParserCombinators.Parsec
+	import Harrorth.AST
+
+On with the good stuff.
+
+== The root of the grammar
 
 Next we see the definition of a parser for a forth program. This is where the
-"simple" part comes in - Parsec is a parser combinator library. We define the
-parser for a forth program by combining to parsers:
+"simple" part comes in - the one about parser combinator blah blah blah. We
+define the parser for a forth program by combining two parsers:
 
 * A parser for forth expressions
 * A parser for eof
 
-It's type is `forthProgram :: Parser Forth`, btw. It's a function that returns
-the type `Forth` (recall, `[Exp]`), within the Parser monad.
+	forthProgram :: Parser Forth
+	forthProgram = do
+		ast <- forth
+		eof
+		return ast
 
-The combination process is provided by the Parser monadic bind operator. Do
-notation, as you can see mentioned in a billion and one monad tutorials, is
+It's type, `forthProgram :: Parser Forth` means that it's a function that
+returns the type `Forth` (recall, `[Exp]`), within the Parser monad. The parser
+monad is the "monadic" part of what Parsec is.
+
+Monads are, as you probably may have head, representations of computations, and
+err, things that can fail, and uhm, more stuff. Forget about that for now.
+
+You can go try to play around with the "Meet the Monads" tutorial:
+http://www.nomaware.com/monads/html/meet.html
+
+The parsing process of a combinator parser is combining parsers, and making
+sure they can parse the input they got in the order they were defined. This
+process is provided by Parser's implementation of `>>=`, the monadic bind
+operator.
+
+== Do notation and monads
+
+Do notation, as you can see mentioned in a billion and one monad tutorials, is
 just short hand for glueing stuff together with monadic binds.
 
-What do notation gives us in this definition is the ability to parse some forth
-code, extract the result of that into a variable called `ast` and then parse an
-end of input.
+When translate the above from do notation, here's what it looks like:
+
+	forthProgram :: Parser Forth
+	forthProgram = do
+		forth >>= \ast ->  -- parse forth, feed result into a function that takes `ast`
+			eof >>= \_ ->  -- and parses eof, feed result into a function that
+				return ast -- ignores it's params, and returns `ast`
+
+What Parsec's `>>=` gives us is a routine that will try to parse some input,
+and then try the next parser. If something doesn't work out, it gives up.
+
+Do notation lets us say it more clearly:
+
+* first parse forth, collect result
+* then parse eof
+* then return result
 
 The Parser monad makes sure that the combination of `forth` and `eof` works
 out.
+
+`return` is also monadic nonesense. It puts `ast` back into the Parser monad.
+This will allow the value coming out of `forthProgram` to be combined with
+other parsers.
+
+Monads, as I see them now, are a way to intermix something that must happen in
+a sequence, cleanly with other data. Parsing takes stuff out of a string, and
+then tries to apply functions that build a result.
+
+By using a monadic library, we can leverage types to get the application of the
+parsing logic automatically.
+
+All we have to do is declare it properly.
+
+=== Our combined parsers
 
 `eof` is a builtin parser, and it should be easy to guess what it does ;-).
 Let's look at `forth` instead:
@@ -92,6 +166,29 @@ So `NewWord name body` creates a new `Exp`, with the data we extracted from the
 string we just parsed. `return` is the way to insert our `Exp` into the Parser
 monad. We need this because otherwise our parser for new words is not a part of
 the Parser monad, and cannot mean anything to Parsec.
+
+== The Rest
+
+	literal :: Parser Exp
+	literal = do
+		lit <- many1 digit
+		return $ Push (read lit)
+
+	word :: Parser Exp
+	word = do
+		name <- wordName
+		return $ Invoke name
+
+	wordName :: Parser String
+	wordName = do
+		name <- many1 letter
+		return name
+				
+	sep :: Parser ()
+	sep = skipMany1 space
+
+	maybeSep:: Parser ()
+	maybeSep = skipMany space
 
 == Playing with the parser
 

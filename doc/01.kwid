@@ -11,28 +11,28 @@ If you're too lazy:
 * I hope it will teach me all three
 * I hope I can document how I got there in this tutorial.
 
-== The Benefits
+== Background
 
-What I hope to get of the three languages:
+I'm a Perl programmer, sucked into Pugs development. Haskell seemed very
+attractive, but every time I tried to learn it, I got through a tutorial, and I
+said "ok, now what".
 
-* Haskell
-** Monads
-*** IO
-**** Interactive
-**** Files
-*** Storage
-** Tools
-*** Parsec
-*** GADT
-*** C code embedding
-**** of parrot
-* Forth
-** The concept in general
-* Parrot
-** The details
-*** PMC implementations
-*** builtin ops
-*** general usage
+I did not grok monads.
+
+I mean, I could use them, and I sort of knew what they were doing, but I had no
+clue what they were good for.
+
+I had no clue when something becomes a monad, and when it isn't.
+
+I had even less of a clue when something should be a monad.
+
+== This Tutorial Thing
+
+This tutorial-journal thing is supposed to be a document, following I did to
+try and get myself moving forward. It's supposed to be written in a way that
+any reader can follow along, and hopefully reproduce the process.
+
+Maybe if I figured out what the hell is going on, someone else could too =)
 
 == What I Do Know
 
@@ -52,11 +52,11 @@ What I don't know:
 * Parrot's Assembley
 
 I plan to touch on the things that I do know, but I don't think I can introduce
-them that well. Instead I'll point you to some tutorials, and hope for the
-best, while trying to provide half hearted introductions to not-yet-discussed
-concepts.
+them very well.
 
-I do want to keep this short and sweet, though.
+Instead I'll point you to some other documents, and hope for the best. Not
+"getting" these tutorials probably isn't going to be a problem, because I
+didn't.
 
 == The Plan
 
@@ -92,6 +92,29 @@ will teach us some parrot APIs, and haskell constructs.
 We will try to optimize the AST, and the pretty printed code. Forth is
 notoriously optimizable. This should be a test for our design, and abilities.
 
+== Language Feature Summary
+
+What I hope to get of the three languages:
+
+* Haskell
+** Monads
+*** IO
+**** Interactive
+**** Files
+*** Storage
+** Tools
+*** Parsec
+*** GADT
+*** C code embedding
+**** of parrot
+* Forth
+** The concept in general
+* Parrot
+** The details
+*** PMC implementations
+*** builtin ops
+*** general usage
+
 = Summary
 
 Writing these words, and commiting them to darcs, I've yet to write a single
@@ -100,7 +123,10 @@ line of code.
 I hope the plan will change, and that the only things I will go back in time
 for are grammarical corrections and the likes.
 
+I plan to edit out my mistakes only if I think they create too much confusion.
+
 The tutorial is supposed to track my thoughts - a sort of journal, but not in
-journal format.
+journal format. If it's not readable as instructions one can follow, please
+submit a bug.
 
 Wish me luck!

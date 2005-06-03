@@ -13,3 +13,11 @@ Reading http://home.tampabay.rr.com/jforth/C04_Tutorial_Beginning.html
 AST defined, going to try to parse forth into it
 
 Parser done!
+
+= Day 2
+
+== Revisions
+
+=== docs/01.kwid
+
+Gave more background, more context

@@ -21,3 +21,9 @@ Parser done!
 === docs/01.kwid
 
 Gave more background, more context
+
+=== docs/02.kwid
+
+complete def of AST, discussion of type constructors, pattern matching, and
+type classes.
+

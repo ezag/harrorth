@@ -1,11 +1,49 @@
 = Representing Forth In Memory
 
-Rational thinking leads me to believe that I need to know forth to parse.
-Googling for `forth tutorial` yielded
+In this chapter we'll be using both Forth and Haskell. To get a bigger picture
+of what we're doing with Haskell in here, you should go through a short haskell
+tutorial, or the begining of a longer one. Once you can read a function like
+
+	factorial 0 = 1
+	factorial n = n * $ factorial n - 1
+
+You should have soaked up enough haskell to continue.
+
+Here are some links:
+
+* Yet Another Haskell Tutorial - http://www.isi.edu/~hdaume/htut/
+This is the gentlest of the three. Go through the first several pages.
+
+* Haskell Tutorial for C Programmers - http://www.haskell.org/~pairwise/intro/intro.html
+This is a very good tutorial, but it covers a bit more than what you need to
+follow. You might like to read through it regardless.
+
+* HaskellDemo - http://www.haskell.org/hawiki/HaskellDemo
+This is a very concise and fast paced demonstration of haskell's syntax
+
+If you'd like to skip that you should at least read another tutorial's
+introduction, to see what haskell is (lazy, functional, etc), and get a picture
+of what that means.
+
+I expect the functional aspects of haskell to be exploited and discussed in
+detail later, when we need them. I apologize for the order in which things are
+presented, but this is the order in which it makes sense to write a compiler.
+
+Moving on...
+
+== The Forth Language
+
+Rational thinking leads me to believe that I need to know forth in order to
+write a compiler for it.  Googling for `forth tutorial` yielded
 http://home.tampabay.rr.com/jforth/C04_Tutorial_Beginning.html.
 
-Superficially it looks like there are three things that can happen in a forth
-program:
+Forth is based around two data structures - the stack, and the word dictionary.
+Every "word" (you can read that as "function"), like `+` that needs parameters
+takes them off the stack, and if it produces a result it will place it on the
+stack.
+
+Forth seems very simple to me, right now. Superficially it looks like there are
+three things that can happen in a forth program:
 
 * A new word is defined
 * Some literal is pushed onto the stack
@@ -40,40 +78,184 @@ This word when invoked:
 Will have the same effect as `2 3 3`, since `TWO.THREES` was defined to be the
 expressions `3 DUP`.
 
-`src/Harrorth/AST.hs` is a prelimenary definition of what a forth program can
-look like.
+== An Abstract Syntax Tree
 
-First we are defining what a forth program is:
+To represent Forth in memory we're going to design an Abstract Syntax Tree - a
+structure that can represent all of Forth's features.
+
+`src/Harrorth/AST.hs` is a definition of what a forth program can look like.
+The top of the file says `module Harrorth.AST where`, which is a namespace
+declaration. This ensures that what we define in this file does not clash with
+other definitions with the same names.
+
+First lets define what a complete forth program is:
 
 	`type Forth = [Exp]`
 
-This means that `Forth`, a type, is a list of `Exp`, expressions. In a sense
-writing `Forth` is shorthand for writing `[Exp]`.
+This means that `Forth`, a type, is a list of `Exp` (the name of a type
+describing expressions, which is going to be defined shortly).
 
-Next we have the data type `Exp`. A data type is the definition of a thing that
-can be passed around. For example an `Integer` is a data type, and `3` is a
-thing, whose type is `Integer`. An expression is one of three things in our AST:
+In the abstract this means that anything that looks like Forth code in our
+representation is really 0 or more forth expressions.
+
+`type` is a way to name something. It's not much more than syntatic sugar. In a
+sense writing `Forth` is shorthand for writing `[Exp]`.
+
+Next we have the data type `Exp`. A data type is a more complicated concept.
+
+A data type is the definition of a thing that can be passed around. For example
+an `Integer` is a data type, and `3` is a thing, whose type is `Integer`.
+
+Data types can be polymorphic. An example of this behavior is
+
+	data Bool = True | False
+
+This says that the thing returned by `True` and the thing returned by `False`
+are both of type `Bool`. `Bool` is polymorphic because it's either `True` or
+`False`.
+
+Here is the type signature of a function that accepts a bool, and returns a
+bool:
+
+	someFunc :: Bool -> Bool
+
+This means that if we say
+
+	let foo = someFunc True
+
+then the `Bool` someFunc is getting is the thing `True`, and that `foo` now
+contains a `Bool` as well.
+
+Back to Forth, an expression is one of three things in our AST:
 
 	data Exp
 		= Invoke Word
 		| Push Literal
 		| NewWord Word Forth
 
-It is either an invocation of a word, the pushing of a literal onto the stack,
+An `Exp` is either an invocation of a word, pushing a literal onto the stack,
 or the definition of a new word.
+
+This is a bit more complicated, introducing data constructors. Remember that I
+said "the thing returned by `True`"?, a data constructor is a function.
 
 `Invoke` `Push` and `NewWord` are data constructors. They are functions which
 return a thing of type `Exp`.
 
-The constructor `Invoke` takes a single parameter, of type `Word` (later
-defined as `type Word = String`). How it actually contains the Word is beyond
-us - haskell does that automatically.
+	% ghci src/Harrorth/AST.hs
+	*Harrorth.AST> :t Invoke
+	Invoke :: Word -> Exp
+
+This just printed the type signature of the function `Invoke` for us.
+
+`Invoke` takes a single parameter, of type `Word`.
+
+Here's the definition of `Word`:
+
+	type Word = String
+
+Where is `Invoke` actually defined? How does it store this data in an `Exp`?
+What does the structure of an `Exp` look like? These details are beyond us -
+haskell does that automatically. What we *do* care about, is how we extract the
+data. Think of this as applying a constructor in reverse. Here is a function
+that takes an `Exp` as returned by `Invoke` and gives us the `Word` back:
+
+	theWord :: Exp -> Word
+	theWord (Invoke word) = word
+
+Or in `ghci`:
+
+	*Harrorth.AST> let theWord (Invoke word) = word
+	*Harrorth.AST> :t theWord
+	theWord :: Exp -> Word
+	
+
+This is Haskell's pattern matching in action. It takes an `Exp`, and since it
+defined `Invoke` it knows how to do it in reverse too, when `theWord` is
+invoked:
+	
+	*Harrorth.AST> let exp = Invoke "foo"
+	*Harrorth.AST> :t exp
+	exp :: Exp
+	*Harrorth.AST> theWord exp
+	"foo"
+
+Haskell has some slightly more complicated forms of representing data, but we
+won't be touching them now.
 
 The `NewWord` constructor is a somewhat more interesting example: it bundles a
-`Word` and some `Forth` into a single `Exp`. Recall that `Forth` is really just
-a list of `Exps`.
+`Word` and some `Forth` into a single `Exp`.
 
-Lets represent the AST for this program:
+Wtf? Recall that `Forth` is really just a list of `Exps`. This means that
+`Forth` is a recursive type! It can contain more of itself!
+
+== Type Variables
+
+Haskell has other recursive data types. If you know a bit of LISP this may
+appeal to you, it's also a recursive type:
+
+	data MyList a = Nil
+                  | Cons a (MyList a)
+
+It discusses one other important issue though - type variables.
+
+This reads: "A list of `a`s is either Nil, or Cons of `a` with another list of
+`a`s".
+
+What is an `a`? `a` is type variable. A value of `a` is just another type. Read
+that again but replace `a` with `Int`. What is `Nil`? We don't really know. But
+we know it's not the result of `Consing` an `Int` with another list. We're
+using it to represent the end of the list.
+
+	Cons 4 Nil
+
+returns a `MyList`, one element long, which contains a 4, and then the marker
+for end of list.
+
+	Cons 5 (Cons 4 Nil)
+
+Is a two element list - 5 glued to the top of a list with 4 in it.
+
+	Cons 'c' (Cons 4 Nil)
+
+is a type error, because `Cons 4` implies that `a` is replaced with the type of
+`4`, a `Num`:
+
+	*MyList> :t Cons 4 Nil
+	Cons 4 Nil :: (Num a) => MyList a
+	
+Read that as "assuming `a` is a Num, the type of `Cons 4 Nil` is `MyList a`. Or
+just `MyList Num` for now (Num is a type class, hence the funny syntax. We'll
+talk about those in a bit).
+
+	*MyList> :t Cons 'c' Nil
+	Cons 'c' Nil :: MyList Char
+
+This single element list is of type `Char`, so `a` is `Char` in the signature.
+
+Since `Char` is not a `Num`, haskell complains bitterly.
+
+== The remainder of our AST
+
+`Literal` and `Word` are like `Forth`, just shorthands for other types.
+
+	type Word = String
+
+	type Literal = Integer
+
+Interestingly, `String` is
+
+	*MyList> :i String
+	type String = [Char]
+
+For now we're ignoring the fact that Forth contains other types of data. We'll
+deal with that later.
+
+This is all there is to our (current) Forth AST.
+
+== Forth In Haskell
+
+No lets look the AST for this program, as represented in haskell:
 
 	2
 	4
@@ -84,23 +266,53 @@ Lets represent the AST for this program:
 	;
 	FOO
 
-I put an expression on each line, and indented the nested `NewWord` expression
-so that the structure is clear.
+I put an expression on each line, except for the word definition, which is
+indented instead. I hope the structure will become clear:
 
 Writing this as haskell types with our AST, instead of forth source, would look
 like (single line broken in two):
 
-	[ Push 2, Push 4, Invoke "SWAP", NewWord "FOO"
-	[ Push 3, Invoke "SWAP" ], Invoke "FOO" ]
+	proggie =
+		[ Push 2
+		, Push 4
+		, Invoke "SWAP"
+		, NewWord "FOO"
+			[ Push 3
+			, Invoke "SWAP"
+			]
+		, Invoke "FOO"
+		]
 
-Since the source contains the line `deriving Show` in the definition of
-`data Exp`, haskell will make an effort to print anything of type `Forth` for
-us.
+A copy of this is in `src/ForthProggie.hs`. Try running
 
-`Show` is a type class. Any type that can be /shown/, i.e. be converted into a
-string, can belong to that class. What `deriving` means is that we're too lazy
-to say how we want `Exp` to `Show`. Fortunately our Haskell compiler can do it
-for us.  Try this in the Harrorth directory:
+	% ghci -isrc src/ForthProggie.hs
+	*ForthProggie> :t proggie
+	proggie :: [Exp]
+
+As you can see the type of `proggie` is `Forth`!
+
+== Type Classes
+
+Type classes are common behaviors that a type can do. For example:
+
+* Ord - several objects in this type can be compared for their order
+* Show - objects from this type can be "shown" - made into a string
+
+Lets change the definition of `data Exp`:
+
+	data Exp
+		= Invoke Word
+		| Push Literal
+		| NewWord Word Forth
+		deriving Show
+
+If you didn't notice, we added `deriving Show` in the definition of `data Exp`.
+
+What `deriving` means is that Haskell will make `Exp` a member of the type
+class `Show`. Since  we're too lazy to say exactly how we want `Exp` to `Show`,
+`deriving` means that we would like the Haskell compiler to do it for us.
+
+Here's Haskell's guess:
 
 	% ghci src/Harrorth/AST.hs
 	*Harrorth.AST> Invoke "FOO"
@@ -108,7 +320,8 @@ for us.  Try this in the Harrorth directory:
 	*Harrorth.AST> [ Invoke "FOO", Push 3 ]
 	[Invoke "FOO",Push 3]
 
-you can see that it will just reprint what we gave it. Haskell knows how to
-print constructor names, strings, lists and integers on it's own, and that's
-really all we used to represent a forth program in memory.
+you can see that it will just reprint the haskell syntax used to define the
+AST.  Haskell knows how to print constructor names, strings, lists and integers
+on it's own, and that's really all we used to represent a forth program in
+memory.
 

@@ -1,0 +1,292 @@
+= An Evaluator
+
+By the time we're done today, this will be working:
+
+	% ./forth  
+	1 3 . 4 . 5
+	3
+	4
+	Interp {stack = [5,1]}
+
+Yes, a real binary that interprets some lame-ass forth, in a crappy way. Aren't
+you enthusiastic?
+
+== Evaluating ASTs
+
+The process of evaluating an AST is pretty streight forward: you reduce the AST
+into a result. In order to reduce an AST you reduce it's subtrees. The process
+is recursive.
+
+At the leaf level your reductions meet the language primitives:
+
+* IO
+* Storage
+* Builtins
+
+So in order to evaluate a language AST we need to provide
+
+* The primitives - atoms which we do not wish to break up further
+* The reduction logic
+
+In this chapter we're going to provide a two forth primitives:
+
+* Literals
+* The word `.`
+
+and enough reduction logic to glue these two together.
+
+== What is in a Forth interpreter?
+
+A forth interpreter is the thing that will take the AST and "do" it. The
+builtin features of the forth language during runtime are provided by the
+interpreter:
+
+* The stack
+* The word dictionary
+
+Arguably the word dictionary has the builtin words, not the interpreter.
+
+Lets begin
+
+== `src/Harrorth/Eval.hs`
+
+Our usual heading looks like this:
+
+	module Harrorth.Eval where
+	import Harrorth.AST
+
+Next we have the data type for an interpreter
+
+	data Interp = Interp { stack::[Literal] } deriving Show
+
+Why is there only a stack? Since we're only going to deal with a single word
+for now, we're setting that aside. This tutorial is about starting simple and
+taking baby steps.
+
+This type should be pretty readable to you, except for those curly brackets.
+They mean that `Interp` is a record. For now it only has one field, `stack`. 
+
+The stack inside the interpreter is a list of literals.
+
+Here's how you create a new interpreter with an empty stack:
+
+	Interp { stack = [] }
+
+Now lets see what intepreting it might look like:
+
+	interp :: Interp -> Forth -> IO Interp
+
+This function's signature tells us that it takes an `Interp` and some `Forth`,
+and returns an `IO Interp`. WTF?
+
+	% ghci
+	Prelude> :i IO
+	newtype IO a
+	  = IO (GHC.Prim.State# GHC.Prim.RealWorld
+	        -> (# GHC.Prim.State# GHC.Prim.RealWorld, a #))
+
+Lets break it down.
+
+	newtype IO a
+
+That's easy. `IO` is a type with a type variable `a`. Into this type variable
+we're putting an `Interp`.
+
+Next it says that the IO type is really a function, and this is it's signature.
+This function accepts GHC.Prim.State containing a GHC.Prim.Realworld,
+henceforth the universe, and it returns the universe, and our `Interp` in a
+pair.
+
+You may have heard of the `IO` monad passing the world around. This is how it
+does it. Inside the definition of the IO monad, IO's monadic bind will
+deconstruct the `IO Interp` by appllying the function with the current state of
+the universe, and when the binding is complete, a new universe, now altered has
+been returned, along with the `Interp` that was created during `interpret`.
+
+How is the universe altered? This is actually an impurity. When GHC applied a
+function like
+
+	putChar 'c'
+
+something changed. In effect, applying it ∞ times or applying it 0 times is not
+the same.
+
+	foo n = n + 1
+
+on the other hand, can be applied as much or as little as we want, and
+everything will be the same before and after it has happenned.
+
+To wrap `purChar` in a pure context GHC does it within IO's monadic bind. IO's
+bind simply makes sure to send the world into the function that may call
+`putChar`, and to pull a different version of the world after it.
+
+This world persists, and subsequent operations will get chronologic revisions
+of the world. Every time we do it counts, and we can't pretend we never did it.
+
+Type safety makes sure that we don't do it by accident, and that's basically
+how the impure and pure get along.
+
+So what's IOish about a forth program? A forth program can print to the screen.
+
+Lets look at the definition of `interpret`:
+
+	interpret i [] = return i
+	interpret i (exp:exps) = do
+	    i' <- doExp i exp
+	    interpret i' exps
+
+The first definition says what to do when we get an empty ast. We just stick
+the interpreter we got into the IO monad, and call it quits.
+
+The second definition uses the list constructor `(:)` to pattern match the ast,
+and bind two variables out of it: `exp` and `exps`. It is similar in effect to saying
+
+	interpret i ast = do
+	    let exp  = head ast
+	        exps = tail ast
+
+except that there's a crucial implication on the pattern matching - this will
+never ever match an empty list, since an empty list cannot be deconstructed
+with a `(:)`.
+
+As a side note
+
+	(:) 1 2
+
+and
+
+	1 : 2
+
+are equivelent. Functions whose name is parenthesized can be used infix in a
+non parenthesized version.
+
+So back to our interpreting, the next command puts the result of `doExp i exp`
+into a variable called `i'`.
+
+Assuming the expression was "done" we can now interpret the remaining `exps` in
+another interpeter (or if you must, a modified interpeter, with a possibly
+different stack). When we run out of `exps` to recursively evaluate, the
+version of `interpret` matching a `[]` for an AST will be invoked, and it will
+finish.
+
+You can probably guess what `doExp` looks like:
+
+	doExp :: Interp -> Exp -> IO Interp
+
+Now lets "do" a simple forth expression:
+
+	50
+
+This will place `50` on the stack. In our AST version it looks like this:
+
+	Push 50
+
+Recall that `Push` is a type constructor, and we can use it for pattern
+matcing. Here's the implementation to push a literal onto the stack:
+
+	doExp i (Push lit) = return $ pushStack i lit
+
+It extracts the literal value from the `Exp` into the variable `lit`, and then
+calls `pushStack` function with the interpreter and the literal it got, and
+wraps the resulting interpreter in the IO monad.
+
+Here's the actual stack modification function
+
+	pushStack :: Interp -> Literal -> Interp
+	pushStack i@Interp{ stack = stack } lit = i{ stack = (:) lit stack }
+
+It takes an interpreter and a literal, and returns another interpreter, with a
+different stack, based on the one it got (this might sound like an expensive
+operation to an imperative head, but it's not).
+
+This function is pure, because it does not actually modify. In fact, it does not copy
+either, because this kind of data is immutable in Haskell, so the data can be
+shared (gotta love that purity, eh?). What it does is give back a sort of
+delta, which looks to us like a copy.
+
+So when we
+
+	i' <- doExp i Invoke 3
+
+we are in effect creating a new interpreter with 3 on the stack, and we're
+going to use this new interpreter and the remainder of the AST to get other
+stuff done, like printing 3 on the screen:
+
+	3 .
+
+Or in our AST:
+
+	[ Push 3, Invoke "." ]
+
+Here's the definition of a `doExp` that matches `Invoke "."`:
+
+	doExp i (Invoke ".") = do
+	    let (stackHead, i') = popStack i
+	    print stackHead
+	    return i'
+
+Wowza! Some IO! Hey, that was easy, wasn't it?
+
+The line with `let` calls `popStack` on our interpreter.
+
+	popStack :: Interp -> (Literal, Interp)
+	popStack i@Interp{ stack = x:xs } = (x, i{ stack = xs })
+
+This function takes an interpreter, and returns a pair. It uses pattern
+matching to take apart the stack into `x` and `xs`, and returns a pair
+containing the `x`, and an interpreter with `xs` as it's stack.
+
+The left side of `let (stackHead, i')` is pattern matching once more - it takes
+apart the pair, and binds (local to this function) the variables `stackHead`
+and `i'`.
+
+The next line calls `print stackHead`. `print` takes anything that can `Show`:
+
+	Prelude> :t print
+	print :: (Show a) => a -> IO ()
+
+And puts it on STDOUT.
+
+Then we shove our interpreter with a fudged stack into the IO monad, and give
+it to the next iteration of `interpret`.
+
+== Parsing and Evaluating
+
+In the Parsec docs we see a small example function called `run`. I've based the
+function `main` in the file `src/Harrorth/Shell.hs` on it:
+
+	module Main where
+
+	import Text.ParserCombinators.Parsec
+	import Harrorth.Eval
+	import Harrorth.Parser
+	import Harrorth.AST
+
+	main = do
+	    src <- getLine
+	    case (parse forthProgram "" src) of
+	        Left err -> do
+	            putStr "parse error at "
+	            print err
+	        Right x -> dumpInterp x
+
+	dumpInterp :: Forth -> IO ()
+	dumpInterp ast = do
+	    finished <- interpret Interp { stack = [] } ast
+	    print finished
+
+What `main` does is read a line of input, and then parse it with our
+`forthProgram` parser. If the parsing was successful it sends the resulting AST
+on to `dumpInterp`, a function that will create an empty interpreter, interpret
+the AST with it, and then print the final resulting interpreter on the screen
+
+== Compiling to a binary
+
+	% ghc --make -isrc -o forth src/Harrorth/Shell.hs
+
+This will produce a binary called `forth` in the current directory. When you
+invoke it the `main` action will be executed. That's pretty much all there's to
+it.
+
+You can now run the example from the begining of the chapter!
+

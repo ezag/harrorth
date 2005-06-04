@@ -33,3 +33,6 @@ Cover full parser source
 
 try to explain monadic bind better
 
+== Evaluator
+
+Read up on IORef

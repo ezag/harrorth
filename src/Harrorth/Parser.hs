@@ -40,8 +40,10 @@ word = do
 
 wordName :: Parser String
 wordName = do
-	name <- many1 letter
+	name <- many1 wordChar
 	return name
+
+wordChar = do letter <|> char '.'
 		
 sep :: Parser ()
 sep = skipMany1 space

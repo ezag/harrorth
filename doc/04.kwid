@@ -116,7 +116,7 @@ the same.
 on the other hand, can be applied as much or as little as we want, and
 everything will be the same before and after it has happenned.
 
-To wrap `purChar` in a pure context GHC does it within IO's monadic bind. IO's
+To wrap `putChar` in a pure context GHC does it within IO's monadic bind. IO's
 bind simply makes sure to send the world into the function that may call
 `putChar`, and to pull a different version of the world after it.
 

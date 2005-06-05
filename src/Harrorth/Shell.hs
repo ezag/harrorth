@@ -5,6 +5,7 @@ import Text.ParserCombinators.Parsec
 import Harrorth.Eval
 import Harrorth.Parser
 import Harrorth.AST
+import Data.Map
 
 main = do
     src <- getLine
@@ -16,6 +17,8 @@ main = do
 
 dumpInterp :: Forth -> IO ()
 dumpInterp ast = do
-    finished <- interpret Interp { stack = [] } ast
+    finished <- interpret Interp { stack = []
+                                 , dict = empty
+                                 } ast
     print finished
 

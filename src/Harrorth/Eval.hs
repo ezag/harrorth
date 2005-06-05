@@ -3,47 +3,45 @@ module Harrorth.Eval where
 
 import Harrorth.AST
 import Data.Map
+import Control.Monad.Reader
 
 type Stack = [Literal]
 type Dict = Map Word Forth
+
+type Eval a = ReaderT Interp IO a
 
 data Interp = Interp { stack::Stack
                      , dict::Dict
                      }
                      deriving Show
 
-interpret :: Interp -> Forth -> IO Interp
-interpret i [] = return i
-interpret i (exp:exps) = do
-    i' <- doExp i exp
-    interpret i' exps
+interpret :: Forth -> Eval Interp
+interpret [] = ask
+interpret (exp:exps) = do
+    fun <- doExp exp
+    local fun (interpret exps)
 
-doExp :: Interp -> Exp -> IO Interp
+doExp :: Exp -> Eval (Interp -> Interp)
+doExp (Push lit) = doStack (lit:)
+doExp (Invoke ".") = do
+    (x:xs) <- asks stack
+    liftIO $ print x
+    return (\i -> i{ stack = xs })
 
-doExp i (Push lit) = return $ pushStack i lit
+doExp (Invoke ".S") = do
+    liftIO . print =<< asks stack
+    return id
 
-doExp i (Invoke ".") = do
-    let (stackHead, i') = popStack i
-    print stackHead
-    return i'
+doExp (Invoke "0SP") = doStack $ const []
+doExp (Invoke "DUP") = doStack $ \(x:xs) -> x:x:xs
+doExp (Invoke "DROP") = doStack $ tail
+doExp (Invoke "SWAP") = doStack $ \(a:b:xs) -> b:a:xs
+doExp (Invoke "OVER") = doStack $ \stack -> (head stack):stack
+doExp (NewWord word body) = return $ \i -> i{ dict = insert word body (dict i) }
+doExp (Invoke userWord) = do
+    d   <- asks dict
+    i'  <- interpret (d ! userWord)
+    return $ const i'
 
-doExp i (Invoke ".S") = do
-    print $ stack i
-    return i
-
-doExp i (Invoke "0SP") = return i{ stack = [] }
-doExp i@Interp{ stack = x:xs } (Invoke "DUP") = return i{ stack = x:x:xs }
-doExp i@Interp{ stack = x:xs } (Invoke "DROP") = return i{ stack = xs }
-doExp i@Interp{ stack = a:b:xs } (Invoke "SWAP") = return i{ stack = b:a:xs }
-doExp i@Interp{ stack = stack } (Invoke "OVER") = return i{ stack = (head stack):stack }
-
-doExp i@Interp{ dict = dict } (NewWord word body) = return i{ dict = insert word body dict }
-
-doExp i@Interp{ dict = dict } (Invoke userWord) = interpret i $ dict ! userWord
-
-popStack :: Interp -> (Literal, Interp)
-popStack i@Interp{ stack = x:xs } = (x, i{ stack = xs })
-
-pushStack :: Interp -> Literal -> Interp
-pushStack i@Interp{ stack = stack } lit = i{ stack = (:) lit stack }
-
+doStack :: (Stack -> Stack) -> Eval (Interp -> Interp)
+doStack f = return $ \i -> i{ stack = f (stack i) }

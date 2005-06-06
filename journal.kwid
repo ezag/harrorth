@@ -36,3 +36,15 @@ try to explain monadic bind better
 == Evaluator
 
 Read up on IORef
+
+Evaluator finished
+
+= Day 4
+
+lightstep: the mode is part of Interp, presumably. switching from (Interp -> IO (a, Interp)) to (StateT Interp IO a) makes the code somewhat nicer
+
+== docs/05.kwid
+
+Today we try to do user words, and add some builtins
+
+

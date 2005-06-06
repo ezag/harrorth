@@ -1,0 +1,156 @@
+= More Forth
+
+In this chapter we're going to make our Forth a bit more complete.
+
+== Some simple builtins
+
+Here is the stack print builtin:
+
+	doExp i (Invoke ".S") = do
+		print $ stack i
+		return i
+
+This gets the stack out of the interpreter, `i`, and prints it. Since lists
+have instances of the type class `Show` the stack can just be printed as is.
+
+Here's how it works
+
+	1 2 3 .S
+
+Prints the stack:
+
+	[3, 2, 1]
+
+Because 1 was pushed, then 2, then 3, and then the whole stack was printed.
+
+Here are a few more words and their results.
+
+`0SP` clears the stack:
+
+	1 2 3 0SP .S
+	[]
+
+`DUP` duplicates the element at the top of the stack:
+
+	1 2 DUP .S
+	[2, 2, 1]
+
+`DROP` removes the top element, and throws it away:
+
+	1 2 3 DROP .S
+	[2, 1]
+
+`SWAP` exchanges the top element with the one just below it on the stack:
+
+	1 2 3 SWAP .S
+	[2, 3, 1]
+
+This is how they're implemented:
+
+	doExp i (Invoke "0SP") = return i{ stack = [] }
+	doExp i@Interp{ stack = stack } (Invoke "DUP") = return i{ stack = (head stack):stack }
+	doExp i@Interp{ stack = x:xs } (Invoke "DROP") = return i{ stack = xs }
+	doExp i@Interp{ stack = a:b:xs } (Invoke "SWAP") = return i{ stack = b:a:xs }
+
+The first one simply returns a new interpreter derived from the current one,
+with an empty stack.
+
+`DUP`, `DROP` and `SWAP` take the stack out of the interpreter, and return an
+interpreter with a modified stack. They do it using pattern matching.
+
+Figure them out for yourself.
+
+If you're having trouble:
+
+	foo x:xs = ...
+
+	foo [1, 2, 3] -- x gets 1, xs gets [2, 3]
+
+	1:[2, 3] -- [1, 2, 3]
+	
+	head [1, 2, 3] -- 1
+
+== User words
+
+Without user words Forth is not a very useful language.
+
+Here's how you define a word
+
+	: PUSH.TWO.ONES 1 DUP ;
+
+Now a new word is defined, `PUSH.TWO.ONES`. When we invoke it, the forth code
+embedded in the command definition is invoked:
+
+	0SP PUSH.TWO.ONES .S
+	[1, 1]
+
+Is like:
+
+	0SP 1 DUP .S
+	[1, 1]
+
+Here's how we define a new word:
+
+	doExp i@Interp{ dict = dict } (NewWord word body) = return i{ dict = insert word body dict }
+
+What what what? A `dict` in Interp? Yes. Here's the new definition of `Interp`:
+
+	import Data.Map
+
+	type Stack = [Literal]
+	type Dict = Map Word Forth
+
+	data Interp = Interp
+		{ stack   :: Stack
+		, dict    :: Dict
+		} deriving (Show)
+
+As we can see `dict` is of type `Dict`, and we defined `Dict` to be `Map Word
+Forth`.
+
+`Data.Map` is a module that provides mapping from key to value. In this case
+the key is of type `Word` and the value is of type `Forth`.
+
+So `Dict` is a mapping from word names (strings, really) to Forth ASTs.
+
+Lets look at the `doExp` that creates new words in detail.
+
+Recall the type of `NewWord` from `Harrorth.AST`:
+
+	NewWord :: Word -> Forth -> Exp
+
+It binds `dict` to the `Dict` in `i`, our interpreter, and it also breaks the
+expression apart, putting `Word` in `word` and `Forth` in `body`.
+
+So `dict` is our mapping of names to ASTs, and in `word` we have the name of
+the new word, and `body` contains it's definition.
+
+	insert word body dict
+
+This can be read as `insert body keyed by word into dict`. It is provided by
+`Data.Map`, and it returns a new map, with the new entry inside it.
+
+We simply return an interpreter, with a new dictionary, based on the old
+dictionary, but with an additional entry inside it, for the new word.
+
+Here's how we invoke any word:
+
+	doExp i@Interp{ dict = dict } (Invoke userWord) = interpret i $ dict ! userWord
+
+The `(!)` function defined by `Data.Map` extracts the value using a key. So
+
+	dict ! userWord
+
+evaluates to the AST `userWord` has been defined to. `interpret` is simply used
+recursively, from within `doExp`, to evaluate a sort of "sub ast", as expanded
+from the instance of `userWord`.
+
+== Conclusion
+
+Programs like this now work:
+
+	: foo SWAP DUP ; : bar 1 foo . ; 5 bar DROP bar .
+
+Try to figure that one out in your head. I won't give you the answer though. To
+check it, simply run the code in your shiney new interpreter.
+

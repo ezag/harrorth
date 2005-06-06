@@ -47,4 +47,11 @@ lightstep: the mode is part of Interp, presumably. switching from (Interp -> IO 
 
 Today we try to do user words, and add some builtins
 
+= Day 5
+
+Yesterday autrijus fried my brain with the Reader monad. While I was trying to
+recover the bastard sent me a patch, redoing the evaluator with a new monad,
+`Eval`, based on `ReaderT` and `IO.
+
+I'll try to explain it. If I don't come back, you know who did this to me.
 

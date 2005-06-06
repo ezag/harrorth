@@ -11,6 +11,12 @@ By the time we're done today, this will be working:
 Yes, a real binary that interprets some lame-ass forth, in a crappy way. Aren't
 you enthusiastic?
 
+The program in this example pushes 1, then 3 on the stack, prints 3, pushes 4,
+prints that, and pushes 5.
+
+As you can see, 3 and 4 are printed, and 5 and 1 are left on the stack. Cool,
+eh?
+
 == Evaluating ASTs
 
 The process of evaluating an AST is pretty streight forward: you reduce the AST

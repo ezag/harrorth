@@ -103,16 +103,23 @@ sense writing `Forth` is shorthand for writing `[Exp]`.
 
 Next we have the data type `Exp`. A data type is a more complicated concept.
 
-A data type is the definition of a thing that can be passed around. For example
+A type is the definition of a thing that can be passed around. For example
 an `Integer` is a data type, and `3` is a thing, whose type is `Integer`.
 
-Data types can be polymorphic. An example of this behavior is
+A type defined by `data` can also describe more than one "shape" of a value. An
+example of this behavior is
 
 	data Bool = True | False
 
-This says that the thing returned by `True` and the thing returned by `False`
-are both of type `Bool`. `Bool` is polymorphic because it's either `True` or
-`False`.
+This says that the thing you get by evaluating `True` and the thing you get by
+evaluating `False` are both of type `Bool`:
+
+	% ghci
+	Prelude> :t True
+	True :: Bool
+
+That is to say, things of type `Bool` are either `True` or `False`, and no
+other value is possible. `Bool` is a bit like an enumeration in that case.
 
 Here is the type signature of a function that accepts a bool, and returns a
 bool:
@@ -123,8 +130,8 @@ This means that if we say
 
 	let foo = someFunc True
 
-then the `Bool` someFunc is getting is the thing `True`, and that `foo` now
-contains a `Bool` as well.
+then the `Bool` someFunc is getting is the thing `True`, and it evaluates to a
+value, which we name `foo`. `foo`'s type is `foo :: Bool`.
 
 Back to Forth, an expression is one of three things in our AST:
 

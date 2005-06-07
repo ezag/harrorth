@@ -201,7 +201,7 @@ Wtf? Recall that `Forth` is really just a list of `Exps`. This means that
 Haskell has other recursive data types. If you know a bit of LISP this may
 appeal to you, it's also a recursive type:
 
-	data MyList a = Nil
+    data MyList a = Nil
                   | Cons a (MyList a)
 
 It discusses one other important issue though - type variables.
@@ -214,10 +214,11 @@ that again but replace `a` with `Int`. What is `Nil`? We don't really know. But
 we know it's not the result of `Consing` an `Int` with another list. We're
 using it to represent the end of the list.
 
-	Cons 4 Nil
+	Cons True Nil
 
-returns a `MyList`, one element long, which contains a 4, and then the marker
-for end of list.
+returns a `MyList Bool`, one element long, which contains a `True`, and then
+the marker for end of list. The `Bool` due to `a` in `MyList a` being filled in
+with the type of `True`.
 
 	Cons 5 (Cons 4 Nil)
 

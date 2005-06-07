@@ -1,0 +1,543 @@
+= Evaluator Rehaul
+
+This chapter is Autrijus Tang's fault, although, Amir Livne Bar-On is partly
+slightly guilty. These two evil persons invaded my peace and forced monads onto
+my evaluator.
+
+Amir just suggested I looked into it, but Autrijus didn't stop there. He
+submitted a patch to Harrorth, with the whole thing redone with `ReaderT` and
+`WriterT`. What a sadist, eh?
+
+It's going to be abstract, and fuzzy, so I apologize in advance.
+
+Oh my... Let's get started.
+
+== The Reader Monad
+
+The reader monad allows us to change the type signature of our `interpret`
+function, so that it doesn't care about `Interp`. Here's the old definition:
+
+	interp :: Interp -> Forth -> IO Interp
+
+Take an interpreter, and some Forth, and return an interpreter in the `IO` monad,
+presumably after the application of the Forth AST.
+
+This is the new signature:
+
+	interp :: Forth -> Eval Interp
+
+The `Eval` monad is a new monad we'll be defining in a while. It's the
+composition of the `Reader` monad and the `IO` monad. If `IO` was not involved
+it could look like this:
+
+	interp :: Forth -> Reader Interp Interp
+
+That would have been the type for a function interpreting (or rather, in this
+sense defining) the combination of an interpreter's state and an AST into an
+equivelent modified state, and empty AST (which is incidentially omitted).
+
+Lets pretend for a while that the the `IO` monad is in fact really out of the
+picture.
+
+So when you call it:
+
+	interpret [Push 1, Invoke "."]
+
+What do you get? A `Reader Interp Interp`, or a in english a `Reader` of an an
+`Interp` and another `Interp`:
+
+	newtype Reader e a = Reader { runReader :: (e -> a) }
+
+This Reader thing is then invoked like this
+
+	(runReader interpret [Push 1, Invoke "."]) someInterp
+
+So what is `runReader`? It's type is:
+
+	runReader :: Reader r a -> r -> a
+
+That is, runReader takes a reader, and it returns a function. `runReader` on a
+`Reader Interp Interp` returns the function `(e -> a)` where both `e` and `a`
+are `Interp`, hence `runReader :: Reader Interp Interp -> Interp -> Interp`.
+
+== Divergence into Autocurrying
+
+If you read it so that `runReader` takes a Reader, and an `r`, and returns an
+`a`, well, that's the same thing. Lets take `(+)`:
+
+	Prelude> :t (+)
+	(+) :: (Num a) => a -> a -> a
+
+`(+)` takes two parameters, both of a type that is in class `Num`, and returns
+the same type. Let's look at the type of `(1 +)`.
+
+It takes the function `(+)`
+and passes it a `1`, and gets back a function which takes thing that is in
+class `Num`, and then returns that same type.
+
+	Prelude> :t (1 +)
+	(1 +) :: (Num a) => a -> a
+
+What's the type of `(1 + 1)`? Here it is:
+
+	Prelude> :t (1 + 1)
+	(1 + 1) :: (Num a) => a
+
+It's a function that takes no parameters, and returns a num. That's also the
+type of 2, by the way:
+
+	Prelude> :t 2
+	2 :: (Num t) => t
+
+So what's going on? 2 is a function? Yes!
+
+Functions don't really take 2 parameters? Yes!
+
+`(+)` is a function that takes a number, whose evaluation results in  a
+function that takes another number, which evaluates to the sum
+
+Haskell's syntax just lets you ignore the fact that it does that. This sheds
+light on a lot of constructs:
+
+	addA = 1 +
+	addB n = 1 + n
+
+The difference between the two is that the first one says "`addA` is a name
+for the function resulting from applying + to 1".
+
+The second function says "addB is the function \n -> (1 +) n", that is, "`addB`
+is a name for the function that takes a single parameter, n, and then applies
+the function resulting from applying + to 1, to n".
+
+Pretty cool, eh?
+
+== Back to Reader
+
+So if we return to `interpret`, we can say that it encapsulates a function, in
+a `Reader`. Since `runReader` extracts the value (our function) out of the
+`Reader`, the expression
+
+	(runReader (interpret ast))
+
+evaluates to a function, and it's type signature is
+
+	Interp -> Interp
+
+If this is too much theory please stop, back up, and read through it again.
+It's all really some seemingly pointless ping pong. If this is too little
+purpose, read on.
+
+The way the function that takes an Interp and returns an Interp is constructed
+is due to the definition of the instance of `>>=` for the `Reader` type. We'll
+look at that shortly.
+
+What this function does is more important at the moment.
+
+Given the function `initInterp`, which creates an empty interpreter for us,
+lets see what this expression does:
+
+	(runReader (interpret ast)) initInterp
+
+It takes the function which wants an `Interp` and returns an `Interp`, and
+gives it an `Interp`.
+
+Under the surface the function whose type is `Interp -> Interp` could first be
+seen as something like this:
+
+	\i -> ((runReader (doExp someExp)) i)
+
+And `interpret` looks like this:
+
+	interpret ast = return $ \i -> ((runReader (doExp someExp)) i)
+
+Lets say that `someExp` is a bit of the AST. As many famous movie bad guys
+said, "details, details.".
+
+`doExp`'s signature is
+
+	doExp :: Exp -> Reader Interp -> Interp
+
+So `doExp` also returns a function, that takes an interpreter, and does something to it. Lets invent a simplified `doExp`:
+
+	doExp _ = return $ \interp -> interp{ stack = [] }
+
+This `doExp` uses `return` to create a `Reader` which contains a function that
+will return an `Interp` with an empty stack.
+
+`interpret`'s function takes `i`, and then unwraps `doExp`'s function using
+`runReader`, and sends it the interpreter it got.
+
+What do we get out of this? nothing more than a mess right now... But you may
+have noticed that the `AST` and the `Interp` are passed independantly of each
+other.
+
+Remember how the `IO` monad passed the world around implicitly? This is the
+beginings of what we're going to do with our `Interp`. `interpret` is like a
+function with side effects on an `Interp`, a sort of "world of a forth
+program", so we're making sure each invocation gets an `Interp`. We were doing
+that before, though, so what's the big deal?
+
+Well, the elegance of the `IO` monad is that you can just assume the world is
+being passed around, since it always needs to be.
+
+The `Reader` monad lets us do it with our `Interp`. How? Using it's definition
+of `>>=`!
+
+== Enter `>>=`
+
+One of the beautiful aspects of monads in Haskell is that do notation is so
+generalized, basically being readable shorthand for something pretty
+complicated.
+
+Lets look at what a typical `>>=` does.
+
+It takes the value given to it on it's left, and then, applying some logic
+which is "in the monad", eventually shoves the value into the function on it's
+right.
+
+In the `IO` monad `>>=` uses another monad, `State` to retrieve the world, and
+shoves that into the function on it's right.
+
+In the `Reader` monad, `>>=` takes the `Reader` on it's right, like one
+returned from a `doExp`, and then does this magic:
+
+	(Reader r) >>= f = Reader $ \e -> (runReader (f (r e))) e
+
+It extracts the function that `doExp` returns, `r`, and takes the function on
+it's right.
+
+Then it returns a function that takes a parameter called `e`. `e` is an
+`Interp`, by the way. The function returned by `>>=` is actually the function
+returned by by `interpret`.
+
+Lets see exactly what the returned function does:
+
+	(r e)
+
+It applies the `doExp` function to the `Interp` it gets. In this case, the
+stack clearing function (inside `r`) is applied to the empty `Interp` (in `e`).
+This returns an `Interp`, since the type of `r` is:
+
+	r :: Interp -> Interp
+
+Then it applies the other parameter to `>>=`, `f`, or the right hand side, to
+the modified `Interp`. For example, lets take
+
+	interpret ast = doExp (head ast) >>= \i -> return i
+
+Written in do notation as
+
+	interpret ast = do
+		i <- doExp $ head ast
+		return i
+
+So `f` is the function `\i -> return i`. Or basically a function that takes a
+parameter, and puts it in the `Reader` monad. Here's Reader's `return`:
+
+	return a = Reader $ \e -> a
+
+So `return` takes a value, in this case `i`, the `Interp` returned by applying
+`doExp`'s function to the initial `Interp`, and it builds a `Reader` which
+creates a function that takes a single parameter, and just throws it away,
+returning the `i` that `return` was given.
+
+So we evaluated `f (r e)`, and we got a function that takes an `Interp` and
+returns a `Reader` that contains another function that will take an `Interp`,
+throw it away, and return the `Interp` passed into `f`.
+
+We take this function apart using `runReader`, and get the function returned by
+`return`, namely
+
+	\_ -> someInterp
+
+and then we apply it to `e`. `e` is thrown away, the modified interpreter is
+returned.
+
+So let's back up now. The function that does all this is put in a `Reader`, and
+sent back. This is the value of `interpret ast`.
+
+When we take *that* apart with `runReader`, and apply the function to
+`initInterp`, it all reduces, and presto, stuff happens.
+
+Please measure the temperature of your brain, by assertively introducing a
+thermometer to your ear canal. If it's too hot, take a break, you deserve it.
+If it's around 37°c then you are much smarter than me, and you are welcome to
+carry on.
+
+== Real examples
+
+Our `interpret` function does more than just evaluate a single expression. It
+is recursive. Let's first look at the condition for an empty AST, the end of
+the recursion:
+
+	interpret [] = ask
+
+And some definitions from the `Reader` monad and the `Prelude`:
+
+	ask = Reader id
+	id x = x
+
+Or in a single line:
+
+	interpret [] = Reader $ \x -> x
+
+So basically the empty AST will be `interpret`ed into a Reader that contains a
+function that returns whatever is fed into it.
+
+	interpret (exp:exps) = do
+		fun <- doExp exp
+		local fun (interpret exps)
+
+	local f c = Reader $ \e -> runReader c (f e)
+
+This is the general `interpret` function, that reduces a single expression in
+the AST. It takes the function that will change the `Interp`, as returned by
+`doExp` and names it `fun`, and then sends `fun` into the `local` function.
+
+`local` will return a function that takes an `Interp`, and a `Reader`. The
+`Reader` is provided by evaluating `interpret exps`, that is `interpret` on the
+remainder of the AST, after removing the `exp` we are `doExp`ing now. The
+function returned by `local` will apply the function returned by `doExp` on the
+`Interp` it gets, and then take the function returned by `interp exps`, and
+give it the `Interp` as returned by the function that modified the interp, that
+`doExp` provided.
+
+I sound a bit like Mojo Jojo, don't I?
+
+In effect, the recursive process creates functions which get `Interp`s, and
+then apply functions provided by our monadic action, like `doExp` and
+`interpret`, and to the `Interp`s they got.
+
+In a way the `Reader` monad is just plumbing, hidden by do notation, which
+allows us to pass an `Interp` around, without taking an `Interp` at the top
+level.
+
+Autrijus says this lets us have polymorphic evaluation code. I don't see that
+yet, but when we start compiling to Parrot, I should.
+
+== That Pesky `IO` Monad.
+
+Autrijus's patch does something further to our interpretation code. Let's look
+at what it does.
+
+Naturally he imported
+
+	import Control.Monad.RWS
+
+so that the `Reader` monad's definition is available. Now the real changes.
+
+First, he changed the field names in `Interp`, and changed it's constructor
+name too. I bet that's good style:
+
+	data Interp = MkInterp
+		{ interpStack   :: Stack
+		, interpDict    :: Dict
+		} deriving (Show)
+
+Then he created a new type, a monad, called `Eval`
+
+	type Eval a = (MonadReader Interp m, MonadWriter Stack m) => m a
+
+Which combines two other monads, a `Reader` for the `Interp`, and a `Writer`
+for the `IO`.
+
+The `Writer` monad can be treated sort of like a wrapper for `IO` for now. I
+think we've had enough for one day, don't you? We'll look at it later.
+
+Basically it provides a `tell` function which knows to print the `Stack` using
+the `IO` monad.
+
+	interpret :: Forth -> Eval Interp
+	interpret [] = ask
+	interpret (exp:exps) = do
+		fun <- doExp exp
+		local fun (interpret exps)
+
+We've seen these before, when we we're pretending `Eval` was just a `Reader`.
+They are essentially unchanged.
+
+	doExp :: Exp -> Eval (Interp -> Interp)
+	doExp (Push lit) = doStack (lit:)
+
+Here Autrijus uses a function, `doStack`, which applies transformations to the
+stack. In this case, the function `(lit:)` is applied. Remember autocurrying?
+`(:)`, the list constructor, takes an element, and a list. `(lit:)` returns a
+function which needs to get a list, and will return a list wtih `lit` tacked
+on. Here's `doStack`:
+
+	doStack :: (Stack -> Stack) -> Eval (Interp -> Interp)
+	doStack f = return $ \i -> i{ interpStack = f (interpStack i) }
+
+As you can see it returns an `Eval` which contains a function that will apply
+`f`, in this case `(lit:)` to the `interpStack` of `i`, the `Interp` that
+`doStack`'s function will eventully get.
+
+Here are the two reasons why `IO` is involved:
+
+	doExp (Invoke ".") = do
+	    (x:xs) <- asks interpStack
+	    tell [x]
+	    return (\i -> i{ interpStack = xs })
+
+	doExp (Invoke ".S") = do
+	    stack <- asks interpStack
+	    tell stack
+	    return id
+
+These print the top of the stack, and the stack, respectively, remember? They
+do so by using `tell`, the function defined by the stack writer monad, that
+really delegates to `IO`.
+
+An unfamiliar function is `asks`. Let's look at it in more detail:
+
+	asks sel = ask >>= return . sel
+
+Asks takes a function, and composes an `Eval` that will bind `ask`, shorthand
+for `Reader (\x -> x)`, with `return . sel`. So basically, the `Interp` coming
+into the `Eval` action created by `asks` will be passed right into the right
+hand side of '>>=' because `ask` is basically a no-op in that respect.
+
+`return . sel` is a funny one. Here's the definition of `(.)`:
+
+	(f . g) x = f (g x)	
+
+Or
+
+	(.) f g x -> f (g x)
+
+Remember autocurry? The expression is morally equivelent to saying
+
+	asks sel = ask >>= \x -> return (sel x)
+
+The `Interp` will be bound to `x`, which will be fed into `sel`. In our case
+`sel` is `interpStack`, the function that extracts a stack from an `Interp`,
+generated from it's type definition.
+
+So the stack is wrapped in the eval, and then
+
+	stack <- asks interpStack
+
+will extract the stack from `Interp`, and bind it to `stack`. (remember that do
+notation just does `>>=`?).
+
+In the "." word this stack is further pattern matched, and not only that, it
+returns a function that returns an interpreter with only the remainder of the
+stack in it.
+
+Phew!
+
+Let's do some more builtins. This one clears the stack:
+
+	doExp (Invoke "0SP") = doStack $ const []
+
+`const` is defined as
+
+	const a _ = a
+
+Autocurry strikes again!
+
+	const :: a -> b -> a
+
+means that const is also definable as
+
+	const a = \_ -> a
+
+Or a function that takes a parmeter, and returns a function that throws away
+its paramter, and returns `const`'s original parameter.
+
+`const []` is means `\_ -> []`. When sent to `doStack`, it will get a stack,
+throw it away, and return an empty one instead.
+
+You already know `DUP`:
+
+	doExp (Invoke "DUP") = doStack $ \stack -> (head stack):stack
+
+`\stack -> (head stack):stack` is a function that takes a stack, and returns a
+stack with the head of the stack, consed with the stack, that is, the stack
+with it's first element tacked onto it again, or in effect duplicated.
+
+Here's another nice example of currying:
+
+	doExp (Invoke "DROP") = doStack $ tail
+
+`tail` is a function that takes a list, and returns it without the first
+element. Just exchange "list" with "stack" in that sentance (or let type
+inferrence do it for you), and that makes sense too!
+
+You should be able to figure `SWAP` out yourself:
+
+	doExp (Invoke "SWAP") = doStack $ \(a:b:xs) -> b:a:xs
+
+`NewWord` and `Invoke` on user words are similar to what they were before.
+`NewWord` returns a function in the `Eval` monad, that will manipulate the
+dictionary of an `Interp` to contain the new word:
+
+	doExp (NewWord word body) = return $ \i -> i{ interpDict = insert word body (interpDict i) }
+
+And user word invocation `asks` for the dict, `interprets` the AST in the value
+of the entry in the `dict` keyed by `userWord` (the word's body), then extracts
+the `Interp` out of that.
+
+Then it will use `const` to construct a function that simply returns the
+`Interp` created by `interpret`ing the `userWord`'s AST:
+
+	doExp (Invoke userWord) = do
+		dict    <- asks interpDict
+		i'      <- interpret (dict ! userWord)
+		return $ const i'
+
+Autrijus also made some minor changes to `Harrorth.Shell`:
+
+First he modified and adds some imports:
+
+	import Data.Map (empty)
+	import Data.Char (toUpper)
+	import Control.Monad.Reader
+
+Then he changed `main` to convert the forth source code into uppercase. I would
+actually prefer a case sensitive forth interpreter, but what the hell, it's
+easier to type `1 2 dup swap` than `1 2 DUP SWAP`:
+
+	main = do
+	    src <- fmap (map toUpper) getLine		-- see how toUpper is used char by char?
+	    case (parse forthProgram "" src) of
+	        Left err -> do
+	            putStr "parse error at "
+	            print err
+	        Right x -> dumpInterp x
+
+He also adds a function that evaluates to an empty `Interp`:
+
+	initInterp :: Interp
+	initInterp = MkInterp
+	    { interpStack = []
+	    , interpDict  = empty
+	    }
+
+And lastly this `IO` action composes the `IO` action with the the `ReaderT`
+monad transformer, to create the `Eval` monad. It takes the `Eval` from
+`interpret ast`, applies `runReaderT` to it, and then hands the resulting
+function to an `initInterp`.
+
+The resulting `Interp` is bound to `finished`, and then printed.
+
+	dumpInterp :: Forth -> IO ()
+	dumpInterp ast = do
+	    finished <- (`runReaderT` initInterp) $ interpret ast
+	    print finished
+
+The funny syntax:
+
+	`runReaderT`
+
+Takes `runReaderT`, and makes it into an infix function. That line could have
+been written as
+
+	(\x -> (runReaderT x) initInterp) interpret ast
+
+because it autocorries the runReaderT's second parameter (well, it doesn't, it
+does exactly what my explanation line does - creates a function that takes a
+parameter, applies `runReaderT` to it, and then applies the result to
+`initInterp`).
+
+That's it!

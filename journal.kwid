@@ -55,3 +55,13 @@ recover the bastard sent me a patch, redoing the evaluator with a new monad,
 
 I'll try to explain it. If I don't come back, you know who did this to me.
 
+= Day 6
+
+I think I'm finally grokking the Reader monad.
+
+Thanks to Autrijus, Ingo, and `ski` on #haskell
+
+== docs/06.kwid
+
+This chapter is written, ignoring `IO` at first, and explaining `Reader`.
+

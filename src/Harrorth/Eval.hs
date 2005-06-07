@@ -43,10 +43,9 @@ doExp (Invoke ".S") = do
     return id
 
 doExp (Invoke "0SP") = doStack $ const []
-doExp (Invoke "DUP") = doStack $ \(x:xs) -> x:x:xs
+doExp (Invoke "DUP") = doStack $ \stack -> (head stack):stack
 doExp (Invoke "DROP") = doStack $ tail
 doExp (Invoke "SWAP") = doStack $ \(a:b:xs) -> b:a:xs
-doExp (Invoke "OVER") = doStack $ \stack -> (head stack):stack
 doExp (NewWord word body) = return $ \i -> i{ interpDict = insert word body (interpDict i) }
 doExp (Invoke userWord) = do
     dict    <- asks interpDict

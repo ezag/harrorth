@@ -5,8 +5,8 @@ slightly guilty. These two evil persons invaded my peace and forced monads onto
 my evaluator.
 
 Amir just suggested I looked into it, but Autrijus didn't stop there. He
-submitted a patch to Harrorth, with the whole thing redone with `ReaderT` and
-`WriterT`. What a sadist, eh?
+submitted a patch to Harrorth, our own monad, made from an `IO` and a `Reader`
+using `Reader T`, IO. What a sadist, eh?
 
 It's going to be abstract, and fuzzy, so I apologize in advance.
 
@@ -337,11 +337,14 @@ Then he created a new type, a monad, called `Eval`
 
 	type Eval a = (MonadReader Interp m, MonadWriter Stack m) => m a
 
-Which combines two other monads, a `Reader` for the `Interp`, and a `Writer`
-for the `IO`.
+Which combines two other monads, a `Reader`, giving us the `ask` and `local`
+functions, and a `Writer`, which can be treated sort of like a wrapper for `IO`
+for now. I think we've had enough for one day, don't you? We'll look at it
+later.
 
-The `Writer` monad can be treated sort of like a wrapper for `IO` for now. I
-think we've had enough for one day, don't you? We'll look at it later.
+If you would like googleable details, `Eval` is transformed by the `ReaderT`
+monad transformer, to compose `Reader` behaviors with `Writer` behaviors, and
+encapsulate IO actions inside `Writer` actions.
 
 Basically it provides a `tell` function which knows to print the `Stack` using
 the `IO` monad.
@@ -371,7 +374,8 @@ As you can see it returns an `Eval` which contains a function that will apply
 `f`, in this case `(lit:)` to the `interpStack` of `i`, the `Interp` that
 `doStack`'s function will eventully get.
 
-Here are the two reasons why `IO` is involved:
+Here are the two reasons why a monad that be a `MonadWriter` that can write
+`Stack`s is involved:
 
 	doExp (Invoke ".") = do
 	    (x:xs) <- asks interpStack
@@ -384,10 +388,33 @@ Here are the two reasons why `IO` is involved:
 	    return id
 
 These print the top of the stack, and the stack, respectively, remember? They
-do so by using `tell`, the function defined by the stack writer monad, that
-really delegates to `IO`.
+do so by using `tell`. What Autrijus did is say that `IO` can be a
+`MonadWriter` for `Stack`s, and defined the functions to do so:
 
-An unfamiliar function is `asks`. Let's look at it in more detail:
+	instance MonadWriter Stack IO where
+	    tell   = putStr . unlines . map (("==> " ++) . show)
+	    listen = fail "Cannot listen"
+	    pass   = fail "Cannot pass"
+
+When `dumpInterp` in `Harrorth.Shell` will interpret, it will cause the `Eval`
+monad we created to match a monad that is both a `MonadReader` and a
+`MonadWriter`. `ReaderT` is what's called a Monad Transformer, and its job is
+to take the `IO` monad, which is a `MonadWriter`, and the `Reaeder` monad, a
+`MonadReader`, and combine them in a monad that can do both.
+
+I don't know how it does that yet, hopefully I will learn later.
+
+The bottom line is that the `Eval` monad basically says that "an `Eval` monad
+is any monad that can be a `MonadReader` for the `Interp` type, and a
+`MonadWriter` for the `Stack` type". `ReaderT` knows to add `MonadWriter`
+behavior to any monad, Autrijus's `MonadWriter` instance for `IO` does the
+latter.
+
+The `IO` monad can be both, because Autrijus's code makes it `MonadWriter`, and
+`ReaderT` knows how to make it a `MonadReader`.
+
+Another unfamiliar function in the stack printers is `asks`. Let's look at it
+in more detail:
 
 	asks sel = ask >>= return . sel
 
@@ -538,5 +565,8 @@ because it autocorries the runReaderT's second parameter (well, it doesn't, it
 does exactly what my explanation line does - creates a function that takes a
 parameter, applies `runReaderT` to it, and then applies the result to
 `initInterp`).
+
+The `IO` monad enters the picture because of `dumpInterp`. `runReaderT` within
+the `dumpInterp` action gives the `IO` monad `MonadReader` capabilities, and the resulting monad can be matched by type `Eval`.
 
 That's it!

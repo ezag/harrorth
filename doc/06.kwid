@@ -43,8 +43,7 @@ So when you call it:
 
 	interpret [Push 1, Invoke "."]
 
-What do you get? A `Reader Interp Interp`, or a in english a `Reader` of an an
-`Interp` and another `Interp`:
+What do you get? A `Reader Interp Interp`, or a in english a `Reader` computation that has an `Interp` and yields an `Interp`.
 
 	newtype Reader e a = Reader { runReader :: (e -> a) }
 
@@ -155,7 +154,7 @@ said, "details, details.".
 
 `doExp`'s signature is
 
-	doExp :: Exp -> Reader Interp -> Interp
+	doExp :: Exp -> Reader Interp (Interp -> Interp)
 
 So `doExp` also returns a function, that takes an interpreter, and does something to it. Lets invent a simplified `doExp`:
 

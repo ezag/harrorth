@@ -28,8 +28,7 @@ runtime-in-compile time, and sets the name "foo" to contain it.
 A Forth machine has a compile mode, and an interpret mode.
 
 The `:` word changes the mode to compile mode, gobbles up the next wordish
-token in the input stream, allocates some space, links that space from an entry
-in the dictionary (the word we gobbled up).
+token in the input stream, and points to the value of `here` from the dictionary entry keyes by the word we just gobbled up.
 
 In compile mode subsequent words will be looked up, and calls to them will be
 written down in the space allocated for this new word.

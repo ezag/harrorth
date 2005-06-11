@@ -89,7 +89,7 @@ initInterp
 (
 	\e -> runReader
 	(
-		Reader $ \e -> runReader
+		Reader $ \e' -> runReader
 		(
 			interpret []
 		)
@@ -99,7 +99,7 @@ initInterp
 				(doExp exp)
 				e
 			)
-			e
+			e'
 		)
 	)
 	e
@@ -111,7 +111,7 @@ initInterp
 (
 	\e -> runReader
 	(
-		Reader $ \e -> runReader
+		Reader $ \e' -> runReader
 		(
 			Reader $ \x -> x
 		)
@@ -121,7 +121,7 @@ initInterp
 				(doExp exp)
 				e
 			)
-			e
+			e'
 		)
 	)
 	e
@@ -133,14 +133,14 @@ initInterp
 (
 	\e -> runReader
 	(
-		Reader $ \e -> \x -> x
+		Reader $ \e' -> \x -> x
 		(
 			(
 				runReader
 				(doExp exp)
 				e
 			)
-			e
+			e'
 		)
 	)
 	e
@@ -152,14 +152,14 @@ initInterp
 (
 	\e -> runReader
 	(
-		Reader $ \e -> \x -> x
+		Reader $ \e' -> \x -> x
 		(
 			(
 				runReader
 				(doExp Push 1)
 				e
 			)
-			e
+			e'
 		)
 	)
 	e
@@ -170,14 +170,14 @@ initInterp
 (
 	\e -> runReader
 	(
-		Reader $ \e -> \x -> x
+		Reader $ \e' -> \x -> x
 		(
 			(
 				runReader
 				(doStack (1:))
 				e
 			)
-			e
+			e'
 		)
 	)
 	e
@@ -189,7 +189,7 @@ initInterp
 (
 	\e -> runReader
 	(
-		Reader $ \e -> \x -> x
+		Reader $ \e' -> \x -> x
 		(
 			(
 				runReader
@@ -198,7 +198,7 @@ initInterp
 				)
 				e
 			)
-			e
+			e'
 		)
 	)
 	e
@@ -210,7 +210,7 @@ initInterp
 (
 	\e -> runReader
 	(
-		Reader $ \e -> \x -> x
+		Reader $ \e' -> \x -> x
 		(
 			(
 				runReader
@@ -219,7 +219,7 @@ initInterp
 				)
 				e
 			)
-			e
+			e'
 		)
 	)
 	e
@@ -230,12 +230,12 @@ initInterp
 (
 	\e -> runReader
 	(
-		Reader $ \e -> \x -> x
+		Reader $ \e' -> \x -> x
 		(
 			(
 				\i -> i{ interpStack = (1:) (interpStack i) }
 			)
-			e
+			e'
 		)
 	)
 	e

@@ -401,7 +401,23 @@ during the compilation of `SOMEWORD`, so we can see the stack.
 
 	: ]   STATE ON ;
 
-It simply switches to compile mode.
+It simply switches to compile mode. `STATE` is the variable that controls the
+state (surprise!) of the interpreter. `ON` is a nice word:
+
+	: ON TRUE SWAP ! ;
+
+`TRUE` pushes some true value to the stack. `SWAP` exchanges the address with
+the value, since that's how `!` likes it. `!` writes the value to the address.
+
+So what the heck is a variable?
+
+	variable foo
+
+`foo` is now a word, which puts an address on the stack. It's defined when
+`variable` allots some space, and compiles the word to be a literal, whose
+value is the address where space was allotted.
+
+Meanwhile, in the definition of `SOMEWORD`...
 
 `THEN` does it's job at that point, and `;` finishes compilation.
 

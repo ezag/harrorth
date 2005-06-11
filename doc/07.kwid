@@ -4,12 +4,12 @@ In this chapter we are going to look at Forth in greater detail. We will
 learn about the meta-meta-meta-ness of a Forth system, and how forth words
 compile other forth words.
 
-In the next chapter we'll try to apply the knwoelege from this chapter in
+In the next chapter we'll try to apply the knowledge from this chapter in
 Haskell.
 
 == `:` is a Word
 
-First and foremost, `:` and `;` are not syntatic constructs, they are words.
+First and foremost, `:` and `;` are not syntactic constructs, they are words.
 
 In fact, Forth has no syntax more than being a list of words separated by
 spaces.
@@ -57,7 +57,7 @@ size of an address or something like that in Forth, 4 bytes on a 32 bit system.
 === The Definition of `:`
 
 Yet another word is `get-word`. It gobbles up a word from the input stream,
-put's a pointer to the memory space it was read from on the stack, and then
+puts a pointer to the memory space it was read from on the stack, and then
 puts the length of the string read on the stack as well.
 
 Let's try and define `:`
@@ -94,7 +94,7 @@ can we go?
 At the lowest level we need a few operations that must be provided below high
 level forth.
 
-They are, to the best of my knowlege, number arithmetic (hardware), memory
+They are, to the best of my knowledge, number arithmetic (hardware), memory
 access (hardware (arguably also the system, depending on how funky your MMD
 is)), I/O (system), conditional branches (hardware), bit twiddling like AND,
 OR, etc (hardware) as well as a bootstrapped environment, where semantics like
@@ -114,9 +114,9 @@ compiled to machine code with some mechanism. Each high level word (that is,
 one that is not provided by the virtual machine) is basically a sequence of
 addresses to jump to.
 
-=== A Short X86 Assembley Primer
+=== A Short Assembley Primer
 
-Assembley is simpler than most people think. The basic unit is. Registers are
+Assembly is simpler than most people think. The basic unit is. Registers are
 like variables, they store values. They have a name, and there is a constant
 number of them.
 
@@ -148,7 +148,7 @@ stupid way to get that effect:
 This is not very reusable though. What usually happens is that a stack is used
 to keep track of this. We have a dedicated register, pointing to the stack
 "head". When we put a value on the stack that register is incremented, and when
-we take a value out of the stack the register is decremented. X86 assembley has
+we take a value out of the stack the register is decremented. X86 assembly has
 two instructions for this:
 
 	push AX    ; put the value in register AX on the stack
@@ -181,7 +181,7 @@ for now:
 	      jmp NEXT     ; go to the next instruction
 
 	; This instruction uses the stack as a control stack
-	; Assume the two stacks are really independant
+	; Assume the two stacks are really independent
 	RET:  pop SI       ; put the address of our caller's caller's
 	      inc SI       ; continuation in SI
 	      jmp NEXT     ; 
@@ -244,7 +244,7 @@ There are other ways to represent the data in memory, and in Haskell it doesn't
 look like we're going to really be using machine addressing. In the next
 chapter we're going to choose a strategy. Traditional schemes are usually
 variations on the threaded code approach, and you can read more about them on
-the internet: http://www.complang.tuwien.ac.at/forth/threaded-code.html
+the Internet: http://www.complang.tuwien.ac.at/forth/threaded-code.html
 
 == Compiling words
 
@@ -309,7 +309,7 @@ compilation mode.
 Then we find the `THREE` word. We look it up, and since we are not in
 compilation mode, we invoke it. In `THREE` our `NEXT` will find the instruction
 to put a literal on the stack, that instruction will find 2 in the next address
-put that, resume exeucution, where a `CALL` to `PLUS-ONE` is made. `CALL` will
+put that, resume execution, where a `CALL` to `PLUS-ONE` is made. `CALL` will
 put the address after it on the stack, and then place the address of `PLUS-ONE`
 in our instruction pointer. `NEXT` will now invoke the literal instruction
 which places 1 on the stack, and then it will invoke the builtin `+` word. The
@@ -324,7 +324,7 @@ faster than interpreted ones. The lookup is done only once at compile time.
 Repeated invocations of `PLUS-ONE` in `THREE` are cheap, because the address is
 already known.
 
-Another interesting detail is that `;` could be smartedned to look the address
+Another interesting detail is that `;` could be smartened to look the address
 just before `here`. If it is a `CALL` it can convert it to a `JUMP`
 instruction, which will not save `SI` at all. This is what's called a tail call
 optimization. The effect is that `PUSH-ONE`'s `RETURN` will jump directly to
@@ -408,7 +408,7 @@ It simply switches to compile mode.
 As you can see the values `-1` and `40164` have been put on the stack.
 
 `40164` is the cell that `IF` allotted for `THEN`. Try to define `IF` and
-`THEN` for yourself. Another fun excercise is defining `ELSE`. Here's how
+`THEN` for yourself. Another fun exercise is defining `ELSE`. Here's how
 `ELSE` is used.
 
 	: DUP-OR-SWAP DUP IF DUP ELSE SWAP THEN ;

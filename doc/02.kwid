@@ -2,7 +2,7 @@
 
 In this chapter we'll be using both Forth and Haskell. To get a bigger picture
 of what we're doing with Haskell in here, you should go through a short haskell
-tutorial, or the begining of a longer one. Once you can read a function like
+tutorial, or the beginning of a longer one. Once you can read a function like
 
 	factorial 0 = 1
 	factorial n = n * $ factorial n - 1
@@ -98,7 +98,7 @@ describing expressions, which is going to be defined shortly).
 In the abstract this means that anything that looks like Forth code in our
 representation is really 0 or more forth expressions.
 
-`type` is a way to name something. It's not much more than syntatic sugar. In a
+`type` is a way to name something. It's not much more than syntactic sugar. In a
 sense writing `Forth` is shorthand for writing `[Exp]`.
 
 Next we have the data type `Exp`. A data type is a more complicated concept.
@@ -193,7 +193,7 @@ won't be touching them now.
 The `NewWord` constructor is a somewhat more interesting example: it bundles a
 `Word` and some `Forth` into a single `Exp`.
 
-Wtf? Recall that `Forth` is really just a list of `Exps`. This means that
+WTH? Recall that `Forth` is really just a list of `Exps`. This means that
 `Forth` is a recursive type! It can contain more of itself!
 
 == Type Variables

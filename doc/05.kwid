@@ -152,5 +152,5 @@ Programs like this now work:
 	: foo SWAP DUP ; : bar 1 foo . ; 5 bar DROP bar .
 
 Try to figure that one out in your head. I won't give you the answer though. To
-check it, simply run the code in your shiney new interpreter.
+check it, simply run the code in your shiny new interpreter.
 

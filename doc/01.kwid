@@ -40,7 +40,7 @@ First of all, I must say I lied in the README. I do know a bit:
 
 * Naive functional programming
 * Primitive haskell
-* X86 Assembley
+* X86 Assembly
 * Stack based state machines
 
 What I don't know:
@@ -49,7 +49,7 @@ What I don't know:
 ** Monads
 ** Structure
 * Thinking in Forth
-* Parrot's Assembley
+* Parrot's Assembly
 
 I plan to touch on the things that I do know, but I don't think I can introduce
 them very well.
@@ -70,7 +70,7 @@ to design an AST, and how to write Parsec parsers to generate our AST.
 === The evaluator
 
 We will write an evaluator for that AST in Haskell. This will teach us about
-monadic constructs, avoiding lazyness, structures for the interpretation,
+monadic constructs, avoiding laziness, structures for the interpretation,
 interaction with the real world, and meta-language way of thought.
 
 === GADT
@@ -117,11 +117,11 @@ What I hope to get of the three languages:
 
 = Summary
 
-Writing these words, and commiting them to darcs, I've yet to write a single
+Writing these words, and committing them to darcs, I've yet to write a single
 line of code.
 
 I hope the plan will change, and that the only things I will go back in time
-for are grammarical corrections and the likes.
+for are grammatical corrections and the likes.
 
 I plan to edit out my mistakes only if I think they create too much confusion.
 

@@ -19,7 +19,7 @@ eh?
 
 == Evaluating ASTs
 
-The process of evaluating an AST is pretty streight forward: you reduce the AST
+The process of evaluating an AST is pretty straightforward: you reduce the AST
 into a result. In order to reduce an AST you reduce it's subtrees. The process
 is recursive.
 
@@ -78,12 +78,12 @@ Here's how you create a new interpreter with an empty stack:
 
 	Interp { stack = [] }
 
-Now lets see what intepreting it might look like:
+Now lets see what interpreting it might look like:
 
 	interp :: Interp -> Forth -> IO Interp
 
 This function's signature tells us that it takes an `Interp` and some `Forth`,
-and returns an `IO Interp`. WTF?
+and returns an `IO Interp`. WTH?
 
 	% ghci
 	Prelude> :i IO
@@ -105,7 +105,7 @@ pair.
 
 You may have heard of the `IO` monad passing the world around. This is how it
 does it. Inside the definition of the IO monad, IO's monadic bind will
-deconstruct the `IO Interp` by appllying the function with the current state of
+deconstruct the `IO Interp` by applying the function with the current state of
 the universe, and when the binding is complete, a new universe, now altered has
 been returned, along with the `Interp` that was created during `interpret`.
 
@@ -120,19 +120,19 @@ the same.
 	foo n = n + 1
 
 on the other hand, can be applied as much or as little as we want, and
-everything will be the same before and after it has happenned.
+everything will be the same before and after it has happened.
 
 To wrap `putChar` in a pure context GHC does it within IO's monadic bind. IO's
 bind simply makes sure to send the world into the function that may call
 `putChar`, and to pull a different version of the world after it.
 
-This world persists, and subsequent operations will get chronologic revisions
+This world persists, and subsequent operations will get chronological revisions
 of the world. Every time we do it counts, and we can't pretend we never did it.
 
 Type safety makes sure that we don't do it by accident, and that's basically
 how the impure and pure get along.
 
-So what's IOish about a forth program? A forth program can print to the screen.
+So what's IO-ish about a forth program? A forth program can print to the screen.
 
 Lets look at the definition of `interpret`:
 
@@ -141,10 +141,10 @@ Lets look at the definition of `interpret`:
 	    i' <- doExp i exp
 	    interpret i' exps
 
-The first definition says what to do when we get an empty ast. We just stick
+The first definition says what to do when we get an empty AST. We just stick
 the interpreter we got into the IO monad, and call it quits.
 
-The second definition uses the list constructor `(:)` to pattern match the ast,
+The second definition uses the list constructor `(:)` to pattern match the AST,
 and bind two variables out of it: `exp` and `exps`. It is similar in effect to saying
 
 	interpret i ast = do
@@ -163,14 +163,14 @@ and
 
 	1 : 2
 
-are equivelent. Functions whose name is parenthesized can be used infix in a
+are equivalent. Functions whose name is parenthesized can be used infix in a
 non parenthesized version.
 
 So back to our interpreting, the next command puts the result of `doExp i exp`
 into a variable called `i'`.
 
 Assuming the expression was "done" we can now interpret the remaining `exps` in
-another interpeter (or if you must, a modified interpeter, with a possibly
+another interpeter (or if you must, a modified interpreter, with a possibly
 different stack). When we run out of `exps` to recursively evaluate, the
 version of `interpret` matching a `[]` for an AST will be invoked, and it will
 finish.
@@ -188,7 +188,7 @@ This will place `50` on the stack. In our AST version it looks like this:
 	Push 50
 
 Recall that `Push` is a type constructor, and we can use it for pattern
-matcing. Here's the implementation to push a literal onto the stack:
+matching. Here's the implementation to push a literal onto the stack:
 
 	doExp i (Push lit) = return $ pushStack i lit
 
@@ -294,5 +294,5 @@ This will produce a binary called `forth` in the current directory. When you
 invoke it the `main` action will be executed. That's pretty much all there's to
 it.
 
-You can now run the example from the begining of the chapter!
+You can now run the example from the beginning of the chapter!
 

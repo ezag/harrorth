@@ -34,7 +34,7 @@ it could look like this:
 
 That would have been the type for a function interpreting (or rather, in this
 sense defining) the combination of an interpreter's state and an AST into an
-equivelent modified state, and empty AST (which is incidentially omitted).
+equivalent modified state, and empty AST (which is incidentally omitted).
 
 Lets pretend for a while that the the `IO` monad is in fact really out of the
 picture.
@@ -43,8 +43,7 @@ So when you call it:
 
 	interpret [Push 1, Invoke "."]
 
-What do you get? A `Reader Interp Interp`, or a in english a `Reader`
-computation that has an `Interp` and yields an `Interp`.
+What do you get? A `Reader Interp Interp`, or a in english a `Reader` computation that has an `Interp` and yields an `Interp`.
 
 	newtype Reader e a = Reader { runReader :: (e -> a) }
 
@@ -60,7 +59,7 @@ That is, runReader takes a reader, and it returns a function. `runReader` on a
 `Reader Interp Interp` returns the function `(e -> a)` where both `e` and `a`
 are `Interp`, hence `runReader :: Reader Interp Interp -> Interp -> Interp`.
 
-== Divergence into Autocurrying
+== Divergence into Auto-currying
 
 If you read it so that `runReader` takes a Reader, and an `r`, and returns an
 `a`, well, that's the same thing. Lets take `(+)`:
@@ -168,11 +167,11 @@ will return an `Interp` with an empty stack.
 `runReader`, and sends it the interpreter it got.
 
 What do we get out of this? nothing more than a mess right now... But you may
-have noticed that the `AST` and the `Interp` are passed independantly of each
+have noticed that the `AST` and the `Interp` are passed independently of each
 other.
 
 Remember how the `IO` monad passed the world around implicitly? This is the
-beginings of what we're going to do with our `Interp`. `interpret` is like a
+beginnings of what we're going to do with our `Interp`. `interpret` is like a
 function with side effects on an `Interp`, a sort of "world of a forth
 program", so we're making sure each invocation gets an `Interp`. We were doing
 that before, though, so what's the big deal?

@@ -34,7 +34,7 @@ parser.
 
 First and foremost we declare that this file provides the module
 `Harrorth.Parser`. Next we see two `import` clauses. These give us the Parsec
-api, and the AST we defined in the previous chapter.
+API, and the AST we defined in the previous chapter.
 
 	module Harrorth.Parser where
 
@@ -50,7 +50,7 @@ Next we see the definition of a parser for a forth program. This is where the
 define the parser for a forth program by combining two parsers:
 
 * A parser for forth expressions
-* A parser for eof
+* A parser for EOF
 
 	forthProgram :: Parser Forth
 	forthProgram = do
@@ -76,7 +76,7 @@ operator.
 == Do notation and monads
 
 Do notation, as you can see mentioned in a billion and one monad tutorials, is
-just short hand for glueing stuff together with monadic binds.
+just short hand for gluing stuff together with monadic binds.
 
 When translate the above from do notation, here's what it looks like:
 
@@ -98,7 +98,7 @@ Do notation lets us say it more clearly:
 The Parser monad makes sure that the combination of `forth` and `eof` works
 out.
 
-`return` is also monadic nonesense. It puts `ast` back into the Parser monad.
+`return` is also monadic nonsense. It puts `ast` back into the Parser monad.
 This will allow the value coming out of `forthProgram` to be combined with
 other parsers.
 

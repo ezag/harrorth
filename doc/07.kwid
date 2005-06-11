@@ -254,7 +254,7 @@ Let's look at the process of compiling a new word in forth:
 	: THREE 2 PLUS-ONE ;
 	THREE
 
-The `:` word reads the next word (`PLUS-ONE`) rom the source, creates a new
+The `:` word reads the next word (`PLUS-ONE`) from the source, creates a new
 dictionary entry for it (which points to the next available cell on the heap -
 `here`) and puts the parser into compile mode
 
@@ -264,6 +264,13 @@ When we meet a literal in compilation time, it is compiled to something like
 
 Where `PUSH` is the address of the word to push literals on the stack, and
 `VALUE` is the value to push.
+
+To tell literals apart from words, you read to the next bit of whitespace in
+the input stream. The string you got is then looked up in the dictionary. If
+it's found, then it's a word (in compile time it will be written down as part
+of the word we are defining, and in runtime it will be just executed). If it's
+not in the dictionary, you try to parse it as a number. If that works, It's a
+literal.  If it doesn't work, you just complain bitterly.
 
 So we have just evaluated `1`, at compile time, turned it into an integer,
 `allot`ed two cells, and wrote the address of `PUSH` in the first one, and the

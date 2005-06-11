@@ -43,7 +43,8 @@ So when you call it:
 
 	interpret [Push 1, Invoke "."]
 
-What do you get? A `Reader Interp Interp`, or a in english a `Reader` computation that has an `Interp` and yields an `Interp`.
+What do you get? A `Reader Interp Interp`, or a in english a `Reader`
+computation that has an `Interp` and yields an `Interp`.
 
 	newtype Reader e a = Reader { runReader :: (e -> a) }
 

@@ -79,3 +79,12 @@ http://www.ultratechnology.com/meta.html
 
 http://home.arcor.de/a.s.kochenburger/minforth.html
 
+= Step 8
+
+Planning on constructing a continuation oriented representation of forth for
+evaluation. Calls contain the whole AST to call. Branches contain the whole AST
+to continue into.
+
+Have to learn about continuations in haskell, maybe use CPS or tail calls, but
+real continuations are cooler and I should learn about them.
+

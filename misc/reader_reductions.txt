@@ -1,0 +1,11 @@
+runReader (interpret []) initInterp
+
+runReader (ask) initInterp
+
+runReader (Reader id) initInterp
+
+runReader (Reader (\x -> x)) initInterp
+
+(\x -> x) initInterp
+
+initInterp

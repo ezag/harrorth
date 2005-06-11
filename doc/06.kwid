@@ -570,3 +570,8 @@ The `IO` monad enters the picture because of `dumpInterp`. `runReaderT` within
 the `dumpInterp` action gives the `IO` monad `MonadReader` capabilities, and the resulting monad can be matched by type `Eval`.
 
 That's it!
+
+If you feel like reducing the some expressions in more detail,
+`misc/reader_reductions.txt` has two examples. I doubt they're very readable on
+their own, but if you're doing your own reduction and you compare as you go
+along it might help.

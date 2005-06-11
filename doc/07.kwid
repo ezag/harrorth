@@ -114,7 +114,7 @@ compiled to machine code with some mechanism. Each high level word (that is,
 one that is not provided by the virtual machine) is basically a sequence of
 addresses to jump to.
 
-=== A Short Assembley Primer
+=== A Short X86 Assembley Primer
 
 Assembley is simpler than most people think. The basic unit is. Registers are
 like variables, they store values. They have a name, and there is a constant

@@ -254,11 +254,9 @@ Let's look at the process of compiling a new word in forth:
 	: THREE 2 PLUS-ONE ;
 	THREE
 
-The `:` word starts compilation mode, and creates a new space for `PLUS-ONE` to
-be written in. Recall `here` and `allot`.
-
-`:` will point the dictionary entry for `PLUS-ONE` to the current value of
-`here`.
+The `:` word reads the next word (`PLUS-ONE`) rom the source, creates a new
+dictionary entry for it (which points to the next available cell on the heap -
+`here`) and puts the parser into compile mode
 
 When we meet a literal in compilation time, it is compiled to something like
 

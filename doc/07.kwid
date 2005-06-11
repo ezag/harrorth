@@ -35,7 +35,7 @@ In compile mode subsequent words will be looked up, and calls to them will be
 written down in the space allocated for this new word.
 
 When `;` is encountered it switches back to interpret mode, and the new word is
-finalized. Cool, eh?
+finalized, by compiling instruction to return to caller. Cool, eh?
 
 == Defining a New Word
 

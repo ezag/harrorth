@@ -359,7 +359,7 @@ off the top of the stack. When the value is false it jumps directly the the
 THEN part. When the value is TRUE it resumes execution normally, letting the
 second `DUP` happen.
 
-So basically `?DUP` will take the value of the top of the head, and duplicate
+So basically `?DUP` will take the value of the top of the stack, and duplicate
 only if it's true.
 
 So why doesn't `IF`	happen during interpretation? The key is knowing where to

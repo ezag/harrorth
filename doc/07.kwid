@@ -1,8 +1,8 @@
 = Forth for Real
 
 In this chapter we are going to look at Forth in greater detail. We will
-simplify our haskell code, and learn about the meta-meta-meta-ness of a Forth
-system, and why it's going to be fun to do it in Haskell.
+learn about the meta-meta-meta-ness of a Forth system, and how forth words
+compile other forth words.
 
 == `:` is a Word
 

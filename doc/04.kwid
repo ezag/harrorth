@@ -83,7 +83,7 @@ Now lets see what interpreting it might look like:
 	interp :: Interp -> Forth -> IO Interp
 
 This function's signature tells us that it takes an `Interp` and some `Forth`,
-and returns an `IO Interp`. WTH?
+and returns an `IO Interp`. WTF?
 
 	% ghci
 	Prelude> :i IO

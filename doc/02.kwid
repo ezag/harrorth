@@ -193,7 +193,7 @@ won't be touching them now.
 The `NewWord` constructor is a somewhat more interesting example: it bundles a
 `Word` and some `Forth` into a single `Exp`.
 
-WTH? Recall that `Forth` is really just a list of `Exps`. This means that
+WTF? Recall that `Forth` is really just a list of `Exps`. This means that
 `Forth` is a recursive type! It can contain more of itself!
 
 == Type Variables

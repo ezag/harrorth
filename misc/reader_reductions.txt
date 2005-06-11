@@ -9,3 +9,292 @@ runReader (Reader (\x -> x)) initInterp
 (\x -> x) initInterp
 
 initInterp
+
+
+
+runReader (interpret [Push 1]) initInterp
+
+runReader
+(
+	do
+	    fun <- doExp exp
+    	local fun (interpret [])
+)
+initInterp
+
+
+runReader
+(
+	(doExp exp) >>= (\fun -> local fun (interpret []))
+)
+initInterp
+
+
+runReader
+(
+	let m = (doExp exp)
+		k = (\fun -> local fun (interpret []))
+	in Reader $ \e -> runReader (k (runReader m e)) e
+)
+initInterp
+
+
+(
+	let m = (doExp exp)
+		k = (\fun -> local fun (interpret []))
+	in \e -> runReader (k (runReader m e)) e
+)
+initInterp
+
+
+(
+	\e -> runReader
+	(
+		(
+			\fun -> local
+				fun
+				(
+					interpret []
+				)
+		)
+		(
+			runReader
+			(doExp exp)
+			e
+		)
+	)
+	e
+)
+initInterp
+
+
+(
+	\e -> runReader
+	(
+		local
+		(
+			runReader
+			(doExp exp)
+			e
+		)
+		(
+			interpret []
+		)
+	)
+	e
+)
+initInterp
+
+
+(
+	\e -> runReader
+	(
+		Reader $ \e -> runReader
+		(
+			interpret []
+		)
+		(
+			(
+				runReader
+				(doExp exp)
+				e
+			)
+			e
+		)
+	)
+	e
+)
+initInterp
+
+
+
+(
+	\e -> runReader
+	(
+		Reader $ \e -> runReader
+		(
+			Reader $ \x -> x
+		)
+		(
+			(
+				runReader
+				(doExp exp)
+				e
+			)
+			e
+		)
+	)
+	e
+)
+initInterp
+
+
+
+(
+	\e -> runReader
+	(
+		Reader $ \e -> \x -> x
+		(
+			(
+				runReader
+				(doExp exp)
+				e
+			)
+			e
+		)
+	)
+	e
+)
+initInterp
+
+
+
+(
+	\e -> runReader
+	(
+		Reader $ \e -> \x -> x
+		(
+			(
+				runReader
+				(doExp Push 1)
+				e
+			)
+			e
+		)
+	)
+	e
+)
+initInterp
+
+
+(
+	\e -> runReader
+	(
+		Reader $ \e -> \x -> x
+		(
+			(
+				runReader
+				(doStack (1:))
+				e
+			)
+			e
+		)
+	)
+	e
+)
+initInterp
+
+
+
+(
+	\e -> runReader
+	(
+		Reader $ \e -> \x -> x
+		(
+			(
+				runReader
+				(
+					return $ \i -> i{ interpStack = (1:) (interpStack i) }
+				)
+				e
+			)
+			e
+		)
+	)
+	e
+)
+initInterp
+
+
+
+(
+	\e -> runReader
+	(
+		Reader $ \e -> \x -> x
+		(
+			(
+				runReader
+				(
+					Reader $ \_ ->  $ \i -> i{ interpStack = (1:) (interpStack i) }
+				)
+				e
+			)
+			e
+		)
+	)
+	e
+)
+initInterp
+
+
+(
+	\e -> runReader
+	(
+		Reader $ \e -> \x -> x
+		(
+			(
+				\i -> i{ interpStack = (1:) (interpStack i) }
+			)
+			e
+		)
+	)
+	e
+)
+initInterp
+
+
+
+(
+	\e -> runReader
+	(
+		Reader $ \e' ->
+			( \x -> x )
+			(
+				e'{ interpStack = (1:) (interpStack e') }
+			)
+	)
+	e
+)
+initInterp
+
+
+(
+	\e -> runReader
+	(
+		Reader $ \e' ->
+			(
+				e'{ interpStack = (1:) (interpStack e') }
+			)
+	)
+	e
+)
+initInterp
+
+
+
+(
+	\e ->
+		(
+			\e' ->
+				(
+					e'{ interpStack = (1:) (interpStack e') }
+				)
+		)
+		e
+)
+initInterp
+
+
+
+(
+	\e' ->
+		(
+			e'{ interpStack = (1:) (interpStack e') }
+		)
+)
+initInterp
+
+
+
+( \e' -> e'{ interpStack = (1:) (interpStack e') } ) initInterp
+

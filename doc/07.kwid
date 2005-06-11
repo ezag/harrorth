@@ -1,0 +1,449 @@
+= Forth for Real
+
+In this chapter we are going to look at Forth in greater detail. We will
+simplify our haskell code, and learn about the meta-meta-meta-ness of a Forth
+system, and why it's going to be fun to do it in Haskell.
+
+== `:` is a Word
+
+First and foremost, `:` and `;` are not syntatic constructs, they are words.
+
+In fact, Forth has no syntax more than being a list of words separated by
+spaces.
+
+The way `:` behaves is much like looking at the following Perl construct:
+
+	sub foo { return 1 + 1 }
+
+and reading it as
+
+	BEGIN { *foo = sub { return 1 + 1 } }
+
+That is, while it looks like a declaration, it really creates a closure at a
+runtime-in-compile time, and sets the name "foo" to contain it.
+
+A Forth machine has a compile mode, and an interpret mode.
+
+The `:` word changes the mode to compile mode, gobbles up the next wordish
+token in the input stream, allocates some space, links that space from an entry
+in the dictionary (the word we gobbled up).
+
+In compile mode subsequent words will be looked up, and calls to them will be
+written down in the space allocated for this new word.
+
+When `;` is encountered it switches back to interpret mode, and the new word is
+finalized. Cool, eh?
+
+== Defining a New Word
+
+=== Allocation
+
+There is a special word in Forth, `here`. It puts a pointer on the stack, to
+the next free point in memory. Another word, `allot` will increase the pointer
+to that space, by the number in the stack.
+
+	here 10 allot
+
+That bit of forth puts an address in the stack, puts 10 on the stack, and
+allots 10 bytes. Hence we have 10 bytes addressable at the position in the top
+of the stack.
+
+Another word, `cell`, pushes the size of a cell to the stack. A cell is the
+size of an address or something like that in Forth, 4 bytes on a 32 bit system.
+
+=== The Definition of `:`
+
+Yet another word is `get-word`. It gobbles up a word from the input stream,
+put's a pointer to the memory space it was read from on the stack, and then
+puts the length of the string read on the stack as well.
+
+Let's try and define `:`
+
+	: :
+		HERE
+		GET-WORD
+		ADD-DICTIONARY-ENTRY  ( points GET-WORD string to HERE )
+		SWITCH-TO-COMPILE-MODE
+	;
+
+Ignore the fact that defining the word definition word is silly ;-)
+
+== Immediate Words
+
+When you are in compile mode, the way you leave it is by running a word that
+switches the mode during compile time. Words that run at compile time are
+called "immediate words".
+
+Here is `;`'s definition:
+
+	: `;`
+		SWITCH-TO-INTERPRET-MODE
+	; IMMEDIATE
+
+Since `;` must happen during *compilation* time, the word `IMMEDIATE` is used
+to mark that. It applies to the last defined word.
+
+== Bare Metal
+
+So now that we've defined two fundamental forth words words in Forth, how far
+can we go?
+
+At the lowest level we need a few operations that must be provided below high
+level forth.
+
+They are, to the best of my knowlege, number arithmetic (hardware), memory
+access (hardware (arguably also the system, depending on how funky your MMD
+is)), I/O (system), conditional branches (hardware), bit twiddling like AND,
+OR, etc (hardware) as well as a bootstrapped environment, where semantics like
+calling words, stack operations, and builtins are defined.
+
+In short, this stuff will be provided for by haskell.
+
+== Threaded Code
+
+A standard way to interpret forth is that each word is compiled to an array of
+cells, each one containing an address. There are many variations on the theme,
+sometimes the address is the real address in memory to continue executing at.
+This is called Direct Threaded Code.
+
+Basically what you have is instructions that the virtual machine provides are
+compiled to machine code with some mechanism. Each high level word (that is,
+one that is not provided by the virtual machine) is basically a sequence of
+addresses to jump to.
+
+=== A Short Assembley Primer
+
+Assembley is simpler than most people think. The basic unit is. Registers are
+like variables, they store values. They have a name, and there is a constant
+number of them.
+
+	mov AX, 1
+
+In x86 assembler the above instruction puts the value 1 into the register AX.
+
+Let's say this instruction was found at the address `0x1000` in memory. Assume
+another operation would want to set register `AX` to 1, but do this indirectly.
+
+Here's a silly way to do it
+
+	JMP 1000H
+
+This will tell the processor to continue executing code from the address
+`0x1000` in memory.
+
+How does the computer know to come back to where it was? It doesn't. Here's a
+stupid way to get that effect:
+
+	1000: mov AX, 1      ; set AX
+	1001: jmp BX         ; jump to the address in BX
+	...
+	2000: mov BX, 2002H  ; store the instruction to return to in BX
+	2001: jmp 1000H      ; jump to the address of the `mov ax` thing
+	2002: ....           ; execution will resume here
+	....
+
+This is not very reusable though. What usually happens is that a stack is used
+to keep track of this. We have a dedicated register, pointing to the stack
+"head". When we put a value on the stack that register is incremented, and when
+we take a value out of the stack the register is decremented. X86 assembley has
+two instructions for this:
+
+	push AX    ; put the value in register AX on the stack
+	pop BX     ; pop a value from the stack into register BX
+
+Lastly, we have to introduce memory access.
+
+	mov BX, 1000H    ; the arbitrary number 0x1000 is in BX
+	mov AX, [BX]     ; the value at address `0x1000` is now in AX
+
+Note that I'm ignoring the fact that the values are 16 bits wide, and addresses
+refer to bytes, and that CISC instructions typically aren't 1 byte long, and
+whatnot.
+
+Assume this is a cray (bytes aren't addressable, 64 bit words are) running x86
+assembler for simplicity.
+
+=== Back To Our Scheduled Programming
+
+Let's define the `+` vm builtin, and a word that uses it. Although this looks
+like x86 assembler it won't really work, since the stack is used for data and
+control flow at the same time, and that doesn't make much sense. Ignore that
+for now:
+
+	; This builtin uses the stack like a data stack
+	PLUS: pop AX,      ; Take a value off the stack into register AX
+	      pop BX,      ; Put another in register BX
+	      add AX, BX   ; Add BX to AX
+	      push AX      ; Push the result to the stack
+	      jmp NEXT     ; go to the next instruction
+
+	; This instruction uses the stack as a control stack
+	; Assume the two stacks are really independant
+	RET:  pop SI       ; put the address of our caller's caller's
+	      inc SI       ; continuation in SI
+	      jmp NEXT     ; 
+
+	NEXT: mov BX, [SI] ; Put the value of the next instruction in BX
+	      inc SI       ; increment our instruction pointer
+	      jmp BX       ; go to the address we just got out of memory
+
+`PLUS:` is a label. It is like a sort of macro, that an assembler will convert
+into a real address, and replace all instanced of thereof with. So when we jmp
+PLUS, in machine code it gets converted to the code for `jmp`, with the value
+that the instruction at label `PLUS` was assembled to.
+
+Let's say that `PLUS` ended up in the address 0x1000, and `RET` ended up in
+`0x2000`. Here's what the word `: FOO + ;` would be compiled to:
+
+	1000 2000
+
+Just a sequence, two numbers, in this case the addresses of `PLUS` and `RET`.
+
+`NEXT` would find the `0x1000` in whatever address `FOO` was compiled into, and
+would put that value in register `BX`. Then it would increment `SI` to contain
+an address pointing to the next instruction (`0x2000`), and jump to address
+in `BX` (`0x1000`). That address is the plus operation, which will fudge the
+stack a bit, replacing the two elements at the top of the stack with their sum,
+and then jump back to `NEXT`.
+
+`NEXT` would then take the next value out of the address in `SI`, `0x2000`, and
+put it in `BX`, increment `SI`, and then jump to BX (`0x2000).
+
+This is the `RET` call right now. It puts a new value into `SI`, presumably of
+the thing that called `FOO`, and jumps to `NEXT`, which will continue where
+`FOO`'s caller left off.
+
+What does a call look like?
+
+	CALL: push SI	   ; put the next instruction to exec on the stack
+	      mov SI, [SI] ; nibble an instruction
+	      jmp NEXT
+
+Assume `CALL` was compiled to `0x3000` and `FOO` was compiled to `0x4000`.
+Here's `: BAR FOO ;`
+
+	3000 4000 2000
+
+This would take the instruction in address `0x3000`, `CALL`, and jump to it.
+`CALL` puts the current value of `SI`, on the (control) stack. Then it puts the
+value inside the address pointed by `SI` in `SI`. Notice that the value after
+the address of `CALL` is the address of `FOO`. This causes `NEXT` to resume
+execution at address `0x3000`.
+
+When `FOO` jumps to `RET`, the old value of `SI` is taken off the (control)
+stack. `SI` now refers to the memory cell containing `0x4000`, which is not
+what we mean. So `RET` increments `SI` by one more address, jumps to `NEXT`.
+
+The next address is `0x2000`, `RET` again. It takes the next value of `SI` off
+the (control) stack, in this case the caller of `BAR`, and so on and so forth.
+
+There are other ways to get 
+
+== Compiling words
+
+Let's look at the process of compiling a new word in forth:
+
+	: PLUS-ONE 1 + ;
+	: THREE 2 PLUS-ONE ;
+	THREE
+
+The `:` word starts compilation mode, and creates a new space for `PLUS-ONE` to
+be written in. Recall `here` and `allot`.
+
+`:` will point the dictionary entry for `PLUS-ONE` to the current value of
+`here`.
+
+When we meet a literal in compilation time, it is compiled to something like
+
+	PUSH, VALUE
+
+Where `PUSH` is the address of the word to push literals on the stack, and
+`VALUE` is the value to push.
+
+So we have just evaluated `1`, at compile time, turned it into an integer,
+`allot`ed two cells, and wrote the address of `PUSH` in the first one, and the
+value `1` in the second one.
+
+The thing we see is the word `+`. We look it up, and find out that it's not
+immediate, so we push `here` on the stack, `allot` a cell, and write it's
+address into the address at the top of the stack.
+
+In Forth:
+
+	<push address>  ( put the address we looked up on the stack )
+	here            ( put the next free slot on the stack )
+	cell            ( put the cell size on the stack )
+	allot           ( increase the here pointer by `cell` )
+	!               ( write the address of the word in the the address
+                      returned by `here` )
+
+Now `;` is found. It is looked up, and we find out that it's immediate, so we
+invoke it it. It will allot a space for the `RETURN` instruction, and leave
+compilation mode.
+
+The word `:` takes effect again, starting compilation mode, and putting `THREE`
+in the dictionary, pointing to `here`, the value just after the end of
+`PLUS-ONE`. `2` is compiled to a literal pushing 2 on the stack, and then we
+meet the `PLUS-ONE` word. We look it up. It's not immediate, but it's not a
+builtin either.
+
+We write the address to the `CALL` operation and the address to `PLUS-ONE` that
+we found in the dictionary, by `allot`ting two `cell`s and writing to them.
+
+Then we find `;`, and look it up. It's an immediate word, so we invoke it. It
+writes the `RETURN` operation by `allot`ting another `cell`, and then exits
+compilation mode.
+
+Then we find the `THREE` word. We look it up, and since we are not in
+compilation mode, we invoke it. In `THREE` our `NEXT` will find the instruction
+to put a literal on the stack, that instruction will find 2 in the next address
+put that, resume exeucution, where a `CALL` to `PLUS-ONE` is made. `CALL` will
+put the address after it on the stack, and then place the address of `PLUS-ONE`
+in our instruction pointer. `NEXT` will now invoke the literal instruction
+which places 1 on the stack, and then it will invoke the builtin `+` word. The
+`RETURN` operation is next in line. It will take pointer to the next instruction
+in `THREE` from the (control) stack, and invoke `NEXT`. `NEXT` will then
+evaluate `RETURN` once more, going back to the bit of code that called `THREE`,
+the input loop. We then see that there is nothing left in the program, and
+finish.
+
+I have several interesting observations. Firstly, compiled invocations are
+faster than interpreted ones. The lookup is done only once at compile time.
+Repeated invocations of `PLUS-ONE` in `THREE` are cheap, because the address is
+already known.
+
+Another interesting detail is that `;` could be smartedned to look the address
+just before `here`. If it is a `CALL` it can convert it to a `JUMP`
+instruction, which will not save `SI` at all. This is what's called a tail call
+optimization. The effect is that `PUSH-ONE`'s `RETURN` will jump directly to
+`THREE`s `CALLER`, avoiding:
+
+* The stack getting filled with pointers
+* Repeated calls to `RETURN` with nothing in between
+
+Thus increasing efficiency.
+
+Fun, eh? But wait, there's more.
+
+== Branches
+
+Let's meet another part of forth: `IF`.
+
+`IF` is an immediate word, that is it happens directly in compile time, and it
+is also a compile-only word - it can happen only in compile time. Here's what
+MinForth says when you try to feed it an `IF` during interpretation:
+
+	0 0 - if  ? Interpreting a compile-only word in IF
+
+This means that in order to use `IF` we need to be declaring a word. Let's
+define a word:
+
+	: MAYBE-DUP DUP IF DUP THEN ;
+
+This word is identical to the builtin word `?DUP` in functionality.
+
+First it duplicates the stack head, then it does an `IF`. `IF` pops the value
+off the top of the stack. When the value is false it jumps directly the the
+THEN part. When the value is TRUE it resumes execution normally, letting the
+second `DUP` happen.
+
+So basically `?DUP` will take the value of the top of the head, and duplicate
+only if it's true.
+
+So why doesn't `IF`	happen during interpretation? The key is knowing where to
+jump to if the top of the stack is false. During interpretation, you can't just
+look ahead to the next THEN, it's very time consuming.
+
+What `IF` does is it compiles an instruction that jumps to an address if the
+stack head is not zero:
+
+	IFJMP: pop AX
+	       cmp AX, 0
+	       jne NEQ
+	   EQ: mov SI, [SI]
+	       jmp NEXT
+	  NEQ: inc SI
+	       jmp NEXT
+
+This is much like a `CALL`, but with a conditional thrown in. `jne` stands for
+"jump if not equal". `cmp` compares a register with something.
+
+This still doesn't tell us how `IF` knows where `THEN` will be.
+
+Here's the trick. `IF` works by writing this branch, and then allotting another
+cell, and saving it's address on the stack. This cell has not been written to yet.
+
+`THEN` is also an immediate word. What it does is write the value of `here`
+into the address at the top of the stack, that is the "empty" cell that `IF`
+allotted.
+
+Have a look in MinForth:
+
+	: SOMEWORD IF [ .s ] THEN ; -1 40164  ok
+
+The word `[` is an immediate compile only word that just switches back to
+interpret mode. This means that `.s`, the stack printing word, will happen
+during the compilation of `SOMEWORD`, so we can see the stack.
+
+`]` is a runtime word. Here's it's definition:
+
+	: ]   STATE ON ;
+
+It simply switches to compile mode.
+
+`THEN` does it's job at that point, and `;` finishes compilation.
+
+As you can see the values `-1` and `40164` have been put on the stack.
+
+`40164` is the cell that `IF` allotted for `THEN`. Try to define `IF` and
+`THEN` for yourself. Another fun excercise is defining `ELSE`. Here's how
+`ELSE` is used.
+
+	: DUP-OR-SWAP DUP IF DUP ELSE SWAP THEN ;
+
+This word will look at the value at the top of the stack, duplicate it if it's
+true, or swap it with the one below it if it's false.
+
+`ELSE` is basically like an inverted `IF` and a `THEN` in one word.
+
+== Tinkering with a Forth
+
+A valuable tool for understanding forth is a complete forth system like
+MinForth or gforth, which has a `see` command. I personally prefer MinForth
+because it's `see` is more friendly to newbies like myself.
+
+Try this out for yourself:
+
+	: THREE 1 1 1 + + ;
+	see THREE
+
+Here's my guess at how `SEE` works. It looks up the word in question, and then
+reads the first instruction. If the instruction is `CALL` then it looks at the
+dictionary by iterating the values, and figuring out the name of the
+instruction. If it's a literal, it prints out it's value. If it's anything
+else, it finds out the name of the builtin, but this is implementation
+specific.
+
+Here's an interesting example:
+
+	see DUP-OR-SWAP
+	: DUP-OR-SWAP   _DUP _JMPZ +3 _DUP _JMP +1 _SWAP ; ok
+
+As you can see it deparses the actual jumps, not the `IF` `ELSE` `THEN` stuff.
+
+== What Have We Got In Harrorth?
+
+What we've slapped together so far is a pretty naive interpretation of Forth.
+It turns out that forth is far more elegant and reflexive than I initially
+thought.  Nevermind that, it was part of the plan to make mistakes.
+
+Our current system does not have a compile time / runtime distinction
+
+== What Will We Change?
+
+With my new understanding of Forth, my plan is to write an evaluation model
+similar to indirect threaded code, with continuations thrown in for good
+measure.
+
+This and more in the next episode of Harrorth.
+

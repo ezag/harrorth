@@ -65,3 +65,17 @@ Thanks to Autrijus, Ingo, and `ski` on #haskell
 
 This chapter is written, ignoring `IO` at first, and explaining `Reader`.
 
+= Screw the days, I have no idea what day it is.
+
+= 7th Step
+
+== docs/07.kwid
+
+Looking at what a Forth machine really is on the insides.
+
+http://www.complang.tuwien.ac.at/forth/threaded-code.html
+
+http://www.ultratechnology.com/meta.html
+
+http://home.arcor.de/a.s.kochenburger/minforth.html
+

@@ -4,6 +4,9 @@ In this chapter we are going to look at Forth in greater detail. We will
 learn about the meta-meta-meta-ness of a Forth system, and how forth words
 compile other forth words.
 
+In the next chapter we'll try to apply the knwoelege from this chapter in
+Haskell.
+
 == `:` is a Word
 
 First and foremost, `:` and `;` are not syntatic constructs, they are words.
@@ -237,7 +240,11 @@ what we mean. So `RET` increments `SI` by one more address, jumps to `NEXT`.
 The next address is `0x2000`, `RET` again. It takes the next value of `SI` off
 the (control) stack, in this case the caller of `BAR`, and so on and so forth.
 
-There are other ways to get 
+There are other ways to represent the data in memory, and in Haskell it doesn't
+look like we're going to really be using machine addressing. In the next
+chapter we're going to choose a strategy. Traditional schemes are usually
+variations on the threaded code approach, and you can read more about them on
+the internet: http://www.complang.tuwien.ac.at/forth/threaded-code.html
 
 == Compiling words
 

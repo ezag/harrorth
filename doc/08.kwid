@@ -96,7 +96,7 @@ Since we're moving away from a parsed model into an interpreted one, which
 sort of compiles itself, the evaluation and compilation are more tightly
 coupled than before.
 
-Our new interpretation model is stateful, and slightly different than before:
+Our new interpretation model is stateful, and slightly different from before:
 
     data Interp = MkInterp
         { interpStack   :: Stack
@@ -315,7 +315,7 @@ that is the `case` we try to interpret it as a literal.
 
 `reads` is a function appearantly used to implement `read`
 
-In `ghci` try doing `read "1"`. It parses the number out of the string. It's type signature is interesting:
+In `ghci` try doing `read "1"`. It parses the number out of the string. Its type signature is interesting:
 
     read "1" :: (Read a) => a
 
@@ -325,7 +325,7 @@ it:
     toInteger $ read "1" :: Integer
     toInteger :: (Integral a) => a -> Integer
 
-`read "1"` returns an `a` which is in class `Read`, and then `toInterger`'s
+`read "1"` returns an `a` which is in class `Read`, and then `toInteger`'s
 type signature forces `a` to be in the class `Integral` too. Let's look at the
 instances of `Integral`, and guess what `toInteger` functions they define:
 
@@ -376,7 +376,7 @@ The only question is what if the string does not make sense an an integer?
     *** Exception: Prelude.read: no parse
 
 What are exceptions? How do we take care of them? Turns out this is a bit of a
-mess. I tried to do that, but then someone on `#haskeell` suggested that
+mess. I tried to do that, but then someone on `#haskell` suggested that
 instead of using a function that generates an exception, and a function to
 catch it, around it, I should go around the two steps entirely.
 
@@ -386,7 +386,7 @@ possible parses.
     :t reads "1"
     reads "1" :: (Read a) => [(a, String)]
 
-The returned list may have no elements, if nothing could be parsed, and (i'm
+The returned list may have no elements, if nothing could be parsed, and (I'm
 guessing here), more than one element if there are several ways it could be
 parsed.
 
@@ -420,7 +420,7 @@ the buffer - that is processing the next word.
 
 When `reads` returns something, we pattern match a list containing a pair, and
 we take the first element of the pair. We don't really care about the rest (the
-pair's second part contians the remainder of the string that can be parsed. The
+pair's second part contains the remainder of the string that can be parsed. The
 rest of the list is probably explained in `Text.Read`, but I didn't look into
 it).
 
@@ -510,7 +510,7 @@ Now we're going to take a look at `takeWord`.
     interpretWord $ lookupWord word
 
 we are passing the functionality of the second line as a parameter to takeWord.
-In effect, `takeWord` is tail recursive to it's parameter. Sort of like this:
+In effect, `takeWord` is tail recursive to its parameter. Sort of like this:
 
     takeword $ \word -> interpretWord $ lookupWord word
 
@@ -524,12 +524,12 @@ We'll see that in a moment, let's just finish `takeWord`.
 
 `takeWord` has two locally defined functions. One is `breakWord`, which is like
 the Prelude's `words`, except it doesn't take apart the buffer into a list of
-strings, it returns a pair containing one word, and the unparsed remainder of
-the string. `dropWhile isSpace buf` is a list function, operating on the list
+strings, instead it returns a pair containing one word, and the unparsed 
+remainder of the string. `dropWhile isSpace buf` is a list function, operating on the list
 of `Char`s that is `buf`. `dropWhile` applies `isSpace` to each char, and
 throws away chars as long as `isSpace someChar` is true. `break` also works by
 applying `isSpace` to the chars (of the string without whitespace in the
-begining), but it returns a pair of lists (of `Chars` - e.g. `String`), putting
+beginning), but it returns a pair of lists (of `Char`s - e.g. `String`), putting
 in the pair's first the initial chars where `isSpace` was false.
 
 The interpreter's buffer is broken into `(word, remain)`. When `word` is the
@@ -610,7 +610,7 @@ that are implemented with primitives.
                 , compileOnly = False
                 }
 
-`primToWord` creates a wrapping `WordDef` to implement a word, and allow it's
+`primToWord` creates a wrapping `WordDef` to implement a word, and allow its
 lookup. 
 
 The initial dictionary contains the list of primitive names:
@@ -622,8 +622,8 @@ and then calls `primToWord` for each of these.
 The `prim` function returns an `Eval Interp` action which performs the
 primitive's task, and this is embedded in the AST for our word.
 
-The only exception to the rule is that the word `;` has it's `immediate` flag
-set to `True`, soo it's not in the primitives list.
+The only exception to the rule is that the word `;` has its `immediate` flag
+set to `True`, so it's not in the primitives list.
 
 Eventually a better solution will be needed, but this is good enough for now.
 
@@ -715,18 +715,18 @@ applied to the word definition, and then returns the interpreter unchanged.
 `showWordDef` constructs a string using `unwords`. It passes `unwords` a list
 of strings, and `unwords` joins them up with spaces.
 
-The definition consists of `:`, followed by the words name, follows by it's
-body, and a `;`. Modifying words that change the words flags, are applied if
+The definition consists of `:`, followed by the word's name, follows by its
+body, and a `;`. Modifying words that change the word's flags are applied, if
 the flags are set.
 
 `showBody` takes an AST, and then does `showExp` on every expression. In the
-future, `ZeroBranches` will be shown, but the tail of the `ZeroBranch` will be
+future, `ZeroBranch`es will be shown, but the tail of the `ZeroBranch` will be
 matched to the tail of the remaining `exps`, so that it will represent the word
 as it was intended, not as it was compiled.
 
 `Push` of a lit is shown as the just the literal's value.
 
-`Calls` to words translate to a name.
+`Call`s to words translate to a name.
 
 `ZeroBranch` is just `0BRANCH` for now. The nested AST is not shown.
 

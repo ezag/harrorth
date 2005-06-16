@@ -88,3 +88,14 @@ to continue into.
 Have to learn about continuations in haskell, maybe use CPS or tail calls, but
 real continuations are cooler and I should learn about them.
 
+== docs/08.kwid
+
+Finished! New stateful evaluation, CPS everywhere (maybe ContT later).
+
+we also have the `SEE` word, but no branching.
+
+I suspect there's a really bad bug in the way branches and calls are handled,
+and that a branch inside a call will cause the caller to not execute properly.
+When `IF` is implemented this will be tested and resolved.
+
+

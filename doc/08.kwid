@@ -1,0 +1,798 @@
+= Implementing Our New Knowlege
+
+In this chapter we're going to muck with the evaluation so that it's more
+consistent with the Forth we learned in the previous chapter.
+
+The AST, the parser, the shell and the evaluator are all problematic at the
+moment. Heck, even the example code is a bit borked ;-)
+
+The design I started with was more of a lack thereof than anything else.
+
+Anywho, out with the old first, in with the new later.
+
+== Purges
+
+=== `src/Harrorth/Parser.hs`
+
+This is no longer necessary. Forth syntax can be parsed with the builtin
+function `words`, or `split(/\s+/, $_)` in perl. Isn't that nice?
+
+=== `src/Harrorth/Shell.hs`
+
+The shell wasn't really much of a shell anywho.
+
+Now the process of reading lines from the user is more tightly coupled with
+evaluation, as we saw in the previous chapter.
+
+Hence, Shell.hs is also departing us.
+
+== Changes
+
+=== `src/Harrorth/AST.hs`
+
+==== A New AST
+
+The first step towards this rehaul is to define what our forth programs will
+look like in memory from now on.
+
+Virtual machine approaches are probably too low level to be enjoyable in
+Haskell, but they do provide inspiration.
+
+Here's a new interpretation of the structure of a forth program in memory:
+
+    type Forth = [Exp]
+
+    data Exp
+        = Push Literal
+        | ZeroBranch Forth
+        | Call WordDef
+        | Prim (Eval Interp)
+        deriving Show
+
+    type Literal = Integer
+    type Word = String
+
+So as you can see a `Forth` is still a list of `Exp`s, but an `Exp` is like a
+cell in a compiled word, not an expression in a structured language.
+
+`Exp`s come in four flavors.
+
+`Push` is familiar - push a literal onto the stack.
+
+`ZeroBranch` is a bit like a branch to an address, but in Haskell the address
+metaphor doesn't work out very nicely. Instead of addressing the list of
+expressions, we're simply going to place it right inside the branch.
+
+Here's how the AST of the definition `: foo if 1 then 2 ;` will look like:
+
+    let rest = [ Push 2 ]
+        word = [ ZeroBranch rest, Push 1 ] ++ rest
+
+The point where we branch has two choices. Each is an entire remainder of the
+program to execute, right after the branch. In this example since the remainder
+of the program in both cases shared a definition (the `Push 2` part), it was
+shared.
+
+When executed `ZeroBranch` will check the top of the stack. If it's false, it
+will interpret only the nested AST, throwing away the AST that follows it, and
+if it's true, nothing will happen, and the execution will resume normally.
+
+A `Call` is quite like a `ZeroBranch`. Let's compile `: bar 1 foo 2 ;`:
+
+    [ Push 1, Call word, Push 2 ]
+
+The only difference between a branch and a call is that when we take a branch,
+the exps after it are thrown away. If we don't take the branch, the exps in it
+are thrown away. In a call, both the AST inside the call, and the AST after it
+are kept around and executed in order.
+
+A `Prim` is a new beast. This is simply going to be an inlined function
+responsible for performing a built in operation. `Prim`s are the most
+bare-bones elements of our virtual machine.
+
+==== New Types for the Evaluator
+
+Since we're moving away from a parsed model into an interpreted one, which
+sort of compiles itself, the evaluation and compilation are more tightly
+coupled than before.
+
+Our new interpretation model is stateful, and slightly different than before:
+
+    data Interp = MkInterp
+        { interpStack   :: Stack
+        , interpDict    :: Dict
+        , interpBuffer  :: String
+        , interpState   :: InterpState
+        } deriving Show
+
+The two additional fields are the state, and the buffer. The buffer contains
+characters from the last line the user punched in.
+
+The state is like a boolean:
+
+    data InterpState = Interpretation | Compilation deriving Show
+
+Another thing that changed is the dictionary.
+
+    type Dict = [WordDef]
+
+Like in the old days, the dictionary is just a list of word definitions.
+
+A word definition contains everything we need to know about a word besides what
+it was compiled to:
+
+    data WordDef = WordDef
+        { immediate   :: Bool
+        , compileOnly :: Bool
+        , name        :: Word
+        , body        :: Forth
+        } deriving Show
+
+=== `src/Harrorth/Eval.hs`
+
+Now that the new types are all sorted out, let's see why we needed the changes.
+
+First of all, we've started reaching further than Haskell 98 defines.
+
+At the top of the file we're putting
+
+    {-# OPTIONS_GHC -fglasgow-exts #-}
+
+to enable the GHC extensions to the haskell standard. This is necessary for
+various `Show` derivations.
+
+`Eval.hs` also has a shiny list of imports:
+
+    module Harrorth.Eval where
+
+    import Data.Char (isSpace, toUpper)
+    import Data.List (find)
+    import System.Exit
+    import System.Console.Readline (readline)
+
+`isSpace` is used to split words, `toUpper` to make our forth system case
+insensitive, `find` is used to retrieve dictionary entries, `exitWith` from
+`System.Exit` is used in the `BYE` word, and `readline` allows the user to edit
+their text when typing it in.
+
+We'll see how these are used later in the file.
+
+==== AST Execution
+
+    execute :: Forth -> Eval Interp
+
+This type signature should be familiar. `interpret` has been renamed, because
+it executes compiled code, while interpretation takes words from the input
+line, finds their definitions, and executes that definition.
+
+The simplest case of `execute` is what to do when there's nothing to do:
+
+    execute [] = nibbleBuffer
+
+`nibbleBuffer` takes a word off the buffer, and eventually will arrange for
+`execute` to be called with some more work to do.
+
+Our general case of `execute` is vaguely similar to the old `interpret`:
+
+    execute (exp:exps) = do
+        i <- doExp exp
+        local (const i) (execute exps)
+
+However, `doExp` does not return a function that modifies the interpreter, it
+returns the actual interpreter, after modification. This is due to a monadic
+mess I got myself into, with `takeWord` and `fillBuffer` which we'll meet later
+on.
+
+I hope to make it a bit more elegant in the future, but for now it'll do.
+
+I skipped two definitions of `execute` which need to come before the general case,
+because they're more specific. Arguably can't be `doExps` since they control
+what recursion `interpret` will perform.
+
+    -- Forth CPS ;-)
+    execute ((Call word):exps) = execute ((body word) ++ exps)
+
+As you can see reducing a call to word is just prepending the word's AST to the
+AST that relies on it's effects.
+
+This is both a bit like inlining (in the C sense), or continuation passing
+style without parameter passing. I think it's witty (we'll see if I regret this
+remark in a few days).
+
+    execute ((ZeroBranch false):true) = do
+        (x:xs) <- asks interpStack
+        local (withStack xs) $ execute $ if (x == 0) then false else true
+
+Reducing a branch is a bit more complicated. It removes the top of the stack,
+and interprets one of the branch's choices based on the element it removed,
+with the modified stack in place. The branch to take is chosen by checking if
+the top of the stack is equal to zero.
+
+    doExp :: Exp -> Eval Interp
+
+`doExp` changed a little. Instead of returning a function that modifies
+interpreters, it returns a modified interpreter. This is due to complications
+in composing `takeWord` with the `:` word.
+
+Primitive resolution is it's simplest form:
+
+    doExp (Prim fun) = fun
+
+That is, just call the primitive's action, and it'll do whatever is needed.
+
+    doExp (Push lit) = doStack (lit:)
+
+Pushing a literal on the stack applies a function that `cons`s the literal with
+the stack, using `doStack`.
+
+    applyStack :: (Stack -> Stack) -> (Interp -> Interp)
+    applyStack f = \i -> i{ interpStack = f (interpStack i) }
+
+`applyStack` is the general stack modifying function thing. Applied to a
+function `f` It creates an anonymous function that applies `f` to the stack,
+and returns an interpreter with the stack that `f` yields.
+
+It has a monadic counterpart:
+
+    doStack :: (Stack -> Stack) -> Eval Interp
+    doStack f = asks $ applyStack f
+
+`asks` applies a given function to the thing inside the `Eval` monad (our
+`Interp`), and then `return`s the result. The function is the one returned by
+`applyStack`.
+
+==== Interactivity
+
+The interactivity of a forth system is rather simple. When there's no compiled
+code to execute, because the last word finished, the next word the user typed
+in is looked up and executed.
+
+If at some point a word switch the system to compilation semantics, words that
+are read are compiled into the word currently being defined, with the exception
+of immediate words which are executed.
+
+In Harrorth `nibbleBuffer` is the function that causes more input to be read,
+and eventually invokes the correct behavior, based on the interpreter state.
+
+    nibbleBuffer = do
+        takeWord findWord
+        where
+            findWord :: Word -> Eval Interp
+            findWord word = do
+                dict <- asks interpDict
+                case (find ((word == ) . name) dict) of
+                    Nothing -> do
+                        case (reads word) of
+                            [] -> do
+                                liftIO $ putStrLn $ "Error: the word " ++ word ++ " is undefined"
+                                nibbleBuffer
+                            ((lit,_):_) -> doLit lit
+                    Just wordDef -> doWord wordDef
+
+It's body is really just `takeWord findWord`, but it has a locally defined
+function, `findWord`. As it's type signature implies, `findWord` takes a word
+as it's only parameter.
+
+`takeWord` takes a function, arranges for a word to be broken off the buffer
+(possibly refilling it by calling `readLine`), and then passes it down to the
+function it got. We'll have a look at `takeWord` in a bit. `nibbleBuffer` has a
+smaller brother:
+
+    nibbleNewBuffer = local (withBuf "") nibbleBuffer
+
+This will force a new line to be read, so that words occurring after a word
+that made an error will be ignored (after all, if the word before them did not
+work as expected they will probably be wrong as well).
+
+`findWord` will use the `find` function from the `Data.List` module. `find`
+takes a function (of type `a -> Bool`) and a list (of type `a`), and applies
+the function to each element in the list, until it finds one where the function
+is `True`. `find` returns a `Maybe a`, because there is no guarantee an element
+can be found in the list.
+
+Our "matching" function is `((word ==) . name)`. Let's break `.` up:
+
+    f . g x = f (g x)
+
+Which means our function can be read as:
+
+    \x -> (word ==) (name x)
+
+Since `.` is only getting two paramters.
+
+`(word ==)` reduces to a function that takes something, and sees if it's equal
+to `word`. Recall that `word` is the parameter that `findWord` got in the first
+place. Since `==` is autocurried, that's why it behaves that way. This is the
+last time i'll mention it, since I think I've exhausted all the confusing uses
+for autocurrying.
+
+`name` is just the data type accessor for the type `WordDef`, so if the name of
+the word in the dictionary is equal to the word `findWord` was handed, we are
+happy.
+
+If we did not find such a word in the dictionary, `find` returns Nothing. When
+that is the `case` we try to interpret it as a literal.
+
+`reads` is a function appearantly used to implement `read`
+
+In `ghci` try doing `read "1"`. It parses the number out of the string. It's type signature is interesting:
+
+    read "1" :: (Read a) => a
+
+`Read` is a type class of things to interpret "1" as. Let's enforce a type on
+it:
+
+    toInteger $ read "1" :: Integer
+    toInteger :: (Integral a) => a -> Integer
+
+`read "1"` returns an `a` which is in class `Read`, and then `toInterger`'s
+type signature forces `a` to be in the class `Integral` too. Let's look at the
+instances of `Integral`, and guess what `toInteger` functions they define:
+
+    Prelude> :i Integral
+    class (Real a, Enum a) => Integral a where
+      quot :: a -> a -> a
+      rem :: a -> a -> a
+      div :: a -> a -> a
+      mod :: a -> a -> a
+      quotRem :: a -> a -> (a, a)
+      divMod :: a -> a -> (a, a)
+      toInteger :: a -> Integer
+            -- Imported from GHC.Real
+    instance Integral Int   -- Imported from GHC.Real
+    instance Integral Integer       -- Imported from GHC.Real
+
+As we can see the class `Integral` has two instances, `Int`, and `Integer`.
+`Integer` is like an `Int` but has no bit limits, and will not overflow.
+
+Let's guess how their two instances might look like:
+
+    instance Integral Integer where
+        toInteger = id
+
+    instance Int Integer where
+        toInteger int = someKindOfCast int
+
+In fact, `someKindOfCast` is probably simpler than we think:
+
+    Prelude> :i Integer
+    data Integer
+      = S# GHC.Prim.Int# | J# GHC.Prim.Int# GHC.Prim.ByteArray#
+    ...
+
+So all `toInteger` on `Int`s must do is use the data constructor S on it's
+param. The `#`, if you're curios, means to use unboxed types. Since the guts of
+`Integer` aren't exposed to the user, it allows it to be faster, without
+compromising safety.
+
+I don't know which `toInteger` will be chosen for the coercion, but since both
+`Integer` and `Int` have instances in the `Read` class, one will be used.
+
+Eventually what `read` results in is an `Integer` parsed from a `String`.
+
+The only question is what if the string does not make sense an an integer?
+
+    Prelude> toInteger $ read "foo"
+    *** Exception: Prelude.read: no parse
+
+What are exceptions? How do we take care of them? Turns out this is a bit of a
+mess. I tried to do that, but then someone on `#haskeell` suggested that
+instead of using a function that generates an exception, and a function to
+catch it, around it, I should go around the two steps entirely.
+
+The function behind `read` is `reads`. It uses the `List` monad to represent
+possible parses.
+
+    :t reads "1"
+    reads "1" :: (Read a) => [(a, String)]
+
+The returned list may have no elements, if nothing could be parsed, and (i'm
+guessing here), more than one element if there are several ways it could be
+parsed.
+
+In order to get at the parsed `Integer`, we're going to pattern match the
+result. So back to `findWord`'s `case` when `find` failed using `word` in
+`dict`, we see
+
+    case (reads word) of
+        [] -> do
+            liftIO $ putStrLn $ "Error: the word " ++ word ++ " is undefined"
+            nibbleBuffer
+        ((lit,_):_) -> doLit lit
+
+A hint on how to read this: when you compile a function definition in Haskell,
+e.g.:
+
+    factorial 0 = 1
+    factorial n = n * factorial (n - 1)
+
+this is really compiled to
+
+    factorial param = case param of
+        0 -> 1
+        n -> n * factorial (n - 1)
+
+so `case` is read as "try these patterns, and use the first one that matches".
+
+Hence, when `reads` returns the empty list, there is no match. We spew out an
+error saying "there's no such word" or somesuch, and then go back to nibbling
+the buffer - that is processing the next word.
+
+When `reads` returns something, we pattern match a list containing a pair, and
+we take the first element of the pair. We don't really care about the rest (the
+pair's second part contians the remainder of the string that can be parsed. The
+rest of the list is probably explained in `Text.Read`, but I didn't look into
+it).
+
+So we have parsed our literal, and now we can `doLit` it.
+
+    doLit lit = do
+        state <- asks interpState
+        let instr = [ Push lit ]
+        case state of
+            Compilation -> appendToCurrentWord instr
+            Interpretation -> execute instr
+
+`doLit` takes a given literal, and performs the correct action, depending on
+the forth system's state. It constructs the tiny AST `[ Push lit ]`, to be used
+in either `case` of `state`. When compiling, it appends the mini AST to the
+word that's being compiled right now, and when interpreting it will just
+execute the mini AST as-is.
+
+Backtrack to `findWord`, the second `case` of the `find` is
+`Just wordDef -> doWord wordDef` - a successful match, whose result is bound to
+`wordDef`. `doWord` is also sensitive to the state.
+
+    doWord wordDef = do
+        state <- asks interpState
+        case state of
+            Compilation -> do
+                if (immediate wordDef)
+                    then interpretWord wordDef
+                    else compileWord wordDef 
+            Interpretation -> do
+                if (compileOnly wordDef)
+                    then do
+                        liftIO $ putStrLn $ "Error: " ++ (name wordDef) ++ " is a compile-only word"
+                        nibbleNewBuffer
+                    else interpretWord wordDef
+
+When the state is compilation, immediate words are interpreted, and regular
+words are compiled in.
+
+`compileWord` takes a word definition and appends it to the currently compiling
+word, and appends a call to the word def:
+
+    compileWord wordDef = appendToCurrentWord [ Call wordDef ]
+
+    appendToCurrentWord exps = do
+        i <- ask
+        let dict        = interpDict i
+            (cur:rest)  = dict
+            cur'        = cur{ body = (body cur) ++ exps }
+        local (\i -> i{ interpDict = cur':rest }) nibbleBuffer
+
+`doing` a word to be compiled causes a new dictionary to be set with `local`.
+The dictionary's top element - the last word inserted, is appended with the `[
+Call wordDef ]` that `compileWord` sent in. Notice that this function is also
+used by `doLit`.
+
+When we are interpreting, on the other hand, the semantics are different.
+Compile-only words cause an error to be printed on the screen. When that
+happens we nibble a new buffer, since the rest of the line we are interpreting
+right now probably doesn't make sense either.
+
+Any other word will be executed normally by calling `interpretWord` on the
+definition.
+
+`interpretWord` is pretty much a special case of `execute`, that works on
+`WordDef`s, instead of ASTs.
+
+    interpretWord wordDef = execute [Call wordDef]
+
+Now we're going to take a look at `takeWord`.
+
+    takeWord fun = do
+        buf <- asks interpBuffer
+        let (word, remain) = breakWord buf
+        case word of
+            "" -> needMore
+            _  -> local (withBuf remain) $ fun word
+        where
+            needMore = fillBuffer $ takeWord fun
+            breakWord buf = break isSpace $ dropWhile isSpace buf
+
+`takeWord` takes a single function, one that accepts word (try to guess
+`takeWord`'s signature). When `takeWord` has finished it's job it will call
+`fun`. This is called continuation passing style. Instead of saying
+
+    let word = takeWord
+    interpretWord $ lookupWord word
+
+we are passing the functionality of the second line as a parameter to takeWord.
+In effect, `takeWord` is tail recursive to it's parameter. Sort of like this:
+
+    takeword $ \word -> interpretWord $ lookupWord word
+
+In fact, most of `Harrorth` is infinitely tail recursive. The only case where
+it's broken is if `BYE` throws an exception to exit the program, or
+`fillBuffer` gets an `^D` from the user.
+
+In effect, the return value of the whole interpretation of a program is the
+little `ask` in `fillBuffer`, which just returns the resulting interpreter.
+We'll see that in a moment, let's just finish `takeWord`.
+
+`takeWord` has two locally defined functions. One is `breakWord`, which is like
+the Prelude's `words`, except it doesn't take apart the buffer into a list of
+strings, it returns a pair containing one word, and the unparsed remainder of
+the string. `dropWhile isSpace buf` is a list function, operating on the list
+of `Char`s that is `buf`. `dropWhile` applies `isSpace` to each char, and
+throws away chars as long as `isSpace someChar` is true. `break` also works by
+applying `isSpace` to the chars (of the string without whitespace in the
+begining), but it returns a pair of lists (of `Chars` - e.g. `String`), putting
+in the pair's first the initial chars where `isSpace` was false.
+
+The interpreter's buffer is broken into `(word, remain)`. When `word` is the
+empty string, we need to refill the buffer using `needMore`. When `word`
+contains something we replace the buffer with `remain`, and apply our
+continuation to the word we broke off.
+
+`needMore` is shorthand for calling `fillBuffer` with `takeWord fun` as the
+a continuation.
+
+In effect, `fillBuffer` and `takeWord` are mutually recursive, and this lets
+the `ReaderT` aspect of our `Eval` monad work.
+
+    fillBuffer cont = do
+        mLine <- liftIO $ readline "> "
+        case mLine of
+            Nothing -> ask
+            Just line -> local (withBuf (map toUpper line)) cont
+
+`fillBuffer` uses `readline`, as exported by `System.Console.Readline`. This is
+a binding to the GNU readline library. It is the moral equivelent of `getLine`,
+but it allows the user to use normal sane command line editing semantics.
+
+The `"> "` is the prompt `readline` will use.
+
+`liftIO` is provided by `ReaderT` and allows `IO` actions to be used on the
+`Eval` monad. It's type is something like
+
+    liftIO :: IO a -> Eval a
+
+except that `Eval` is really a type class. It composes the `Eval` monad such
+that the transformation `ReaderT` applied to `IO` to get `Eval` are repeated,
+and the value provided by `IO` are available to `Eval`'s `>>=`. Essentially
+it's just a type coercion.
+
+So now that we have the value `readline` gave back inside the `IO` monad, in
+this case a `Maybe` we pattern match it. If it's `Nothing`, then the user did
+`^D`, and instead of doing our continuation we return `Eval Interp`. This goes
+all the way up the call chain back to `main`, which simply finishes.
+
+If it's `Just line`, then `line` is bound to the data the user typed in, and we
+can set the buffer to that. Before we set the buffer we convert it to
+uppercase, so that our system is case insensitive.
+
+That's nearly everything. All we have is some utility functions used by various
+calls to `local`, that create functions which replace some field in an
+`Interp`:
+
+    withBuf buf = \i -> i{ interpBuffer = buf }
+
+    withStack = applyStack . const
+
+    withState state = \i -> i{ interpState = state }
+
+Now that we're done with the interpretive logic, we have a few more auxillary
+functions. There are the implementations of the primitives that we have to
+provide, and a function called `initInterp`, that creates an interpreter with a
+usable dictionary of words.
+
+    initInterp = MkInterp
+        { interpStack  = []
+        , interpDict   = initialDict
+        , interpBuffer = ""
+        , interpState  = Interpretation
+        }
+
+`initialInterp` is really boring, all it contiains is some defaults.
+`initialDict` is a bit more interesting. It creates a dictionary full of words
+that are implemented with primitives.
+
+    initialDict =
+        (primToWord ";"){ immediate = True } : map primToWord  prims
+        where
+            primToWord word = WordDef
+                { name = word
+                , body = [ Prim (prim word) ]
+                , immediate = False
+                , compileOnly = False
+                }
+
+`primToWord` creates a wrapping `WordDef` to implement a word, and allow it's
+lookup. 
+
+The initial dictionary contains the list of primitive names:
+
+    prims = words ". .S : 0SP DUP DROP SWAP BYE SEE + - * / ="
+
+and then calls `primToWord` for each of these.
+
+The `prim` function returns an `Eval Interp` action which performs the
+primitive's task, and this is embedded in the AST for our word.
+
+The only exception to the rule is that the word `;` has it's `immediate` flag
+set to `True`, soo it's not in the primitives list.
+
+Eventually a better solution will be needed, but this is good enough for now.
+
+So what does each primitive look like? Well, they are pretty much the same old
+stuff they were before, only `doStack` has changed a bit, and new prims were
+added.
+
+Here are a few definitions:
+
+    prim "BYE" = do -- exit the program
+        liftIO $ exitWith ExitSuccess
+
+    prim "." = do -- print tos
+        x <- fmap head (asks interpStack)
+        liftIO $ print x
+        doStack tail
+
+    prim ".S" = do -- print stack
+        stack <- asks interpStack
+        liftIO $ print stack
+        ask
+
+`:` is a bit more complicated:
+
+    prim ":" = do -- define word
+        takeWord makeWord
+        where
+            makeWord word = do
+                i <- ask
+                return i
+                    { interpDict  = (newWord word):(interpDict i)
+                    , interpState = Compilation
+                    }
+            newWord word = WordDef
+                { name        = word
+                , immediate   = False
+                , compileOnly = False
+                , body        = []
+                }
+
+It uses `takeWord` to read a word from the input, passing it `makeWord` as the
+continuation to use. `makeWord` prepends a word definition to the dictionary,
+and changes the interpreter state to compilation. `newWord` is used to create
+an empty word definition with no body.
+
+The next word is `;`:
+
+    prim ";" = asks $ withState Interpretation
+
+It only switches the `Interp` back to the interpretation state.
+
+`SEE` is a wild beast. It deparses compiled word back to `Forth` source code.
+
+    prim "SEE" = do
+        takeWord seeWord
+        where
+            seeWord word = do
+                dict <- asks interpDict
+                case (find ((word == ) . name) dict) of
+                    Nothing      -> do
+                        liftIO $ putStrLn $ "Error: the word " ++ word ++ " does not exist"
+                        nibbleNewBuffer
+                    Just wordDef -> do
+                        liftIO $ putStrLn $ showWordDef wordDef
+                        ask
+            showWordDef wordDef = unwords
+                [ ":"
+                , name wordDef
+                , showBody (body wordDef)
+                , ";"
+                , (if (immediate wordDef) then "IMMEDIATE" else "")
+                , (if (compileOnly wordDef) then "COMPILE-ONLY" else "")
+                ]
+            showBody [] = ""
+            showBody (exp:exps) = unwords [ (showExp exp), showBody exps ]
+            showExp (Push lit) = show lit
+            showExp (Call wordDef) = name wordDef
+            showExp (ZeroBranch _) = "0BRANCH"
+            showExp (Prim _) = "<prim>"
+
+It too reads a word from input using `takeWord`. `seeWord`, the continuation,
+looks the word up in the dictionary. Like `doWord` it will print an error if
+the word cannot be found, throwing away the temporary buffer (this should be
+refactored into a common sub).
+
+If a definition is found, it prints the string resulting from `showWordDef`
+applied to the word definition, and then returns the interpreter unchanged.
+
+`showWordDef` constructs a string using `unwords`. It passes `unwords` a list
+of strings, and `unwords` joins them up with spaces.
+
+The definition consists of `:`, followed by the words name, follows by it's
+body, and a `;`. Modifying words that change the words flags, are applied if
+the flags are set.
+
+`showBody` takes an AST, and then does `showExp` on every expression. In the
+future, `ZeroBranches` will be shown, but the tail of the `ZeroBranch` will be
+matched to the tail of the remaining `exps`, so that it will represent the word
+as it was intended, not as it was compiled.
+
+`Push` of a lit is shown as the just the literal's value.
+
+`Calls` to words translate to a name.
+
+`ZeroBranch` is just `0BRANCH` for now. The nested AST is not shown.
+
+`Prim` cannot be shown, since it's a function. Instead, a stub is provided.
+
+That's it for the `SEE` word.
+
+Next we have generic operations on the stack. They are grouped using this
+definition:
+
+    prim x = doStack $ stackPrim x
+
+where `stackPrim primName` returns a function that can be applied to the stack.
+You know these already:
+
+    stackPrim "0SP" = const []
+    stackPrim "DUP" = \stack -> (head stack):stack
+    stackPrim "DROP" = tail
+    stackPrim "SWAP" = \(a:b:xs) -> b:a:xs
+
+`infixOp` is a new beast. It is a special form of `StackOp` which takes a
+haskell infix operator, like `+`, and fudges the stack so that two params are
+taken off, and the result is pushed back on.
+
+Here are some math operations:
+
+    stackPrim "+" = infixOp (+)
+    stackPrim "-" = infixOp (-)
+    stackPrim "*" = infixOp (*)
+    stackPrim "/" = infixOp div
+
+The `=` comparison operator casts the `Bool` that `(=)` returns back to an
+`Integer`. `fromEnum` returns an `Int`, so that `False` is `0` and `True` is
+`1`. We already know `toInteger` - it's there just to make the type `Literal`
+(a synonym for `Integer`) work out.
+
+Expand the many instances of `.` like we did before, it's a nice excercise:
+
+    stackPrim "=" = infixOp $ ((toInteger . fromEnum) .) . (==)
+
+Hint: this could have been written as
+
+    stackPrim "=" = infixOp $ \a b -> toInteger $ fromEnum (a == b)
+
+Here's the `infixOp` glue function:
+
+    infixOp f = \(a:b:xs) -> (f a b):xs
+
+It patterns matches the stack, applies the function, and returns a `:`'d up
+stack with the result on the top.
+
+=== `src/Harrorth/Main.hs`
+
+Since `Shell.hs` is going out the door, we need a replacement `main`.
+
+    module Main where
+
+    import Control.Monad.Reader (runReaderT)
+    import Harrorth.Eval (nibbleBuffer, initInterp)
+
+    main = do
+        putStrLn "Welcome to Harrorth!"
+        runReaderT (nibbleBuffer) initInterp
+        return ()
+
+But you already know that part.
+
+See you in chapter 9!
+

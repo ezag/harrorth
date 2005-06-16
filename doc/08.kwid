@@ -1,4 +1,4 @@
-= Implementing Our New Knowlege
+= Implementing Our New Knowledge
 
 In this chapter we're going to muck with the evaluation so that it's more
 consistent with the Forth we learned in the previous chapter.
@@ -15,7 +15,7 @@ Anywho, out with the old first, in with the new later.
 === `src/Harrorth/Parser.hs`
 
 This is no longer necessary. Forth syntax can be parsed with the builtin
-function `words`, or `split(/\s+/, $_)` in perl. Isn't that nice?
+function `words`, or `split(/\s+/, $_)` in Perl. Isn't that nice?
 
 === `src/Harrorth/Shell.hs`
 
@@ -24,7 +24,7 @@ The shell wasn't really much of a shell anywho.
 Now the process of reading lines from the user is more tightly coupled with
 evaluation, as we saw in the previous chapter.
 
-Hence, Shell.hs is also departing us.
+Hence, Shell.hs is also leaving us.
 
 == Changes
 
@@ -52,18 +52,18 @@ Here's a new interpretation of the structure of a forth program in memory:
     type Literal = Integer
     type Word = String
 
-So as you can see a `Forth` is still a list of `Exp`s, but an `Exp` is like a
+So, as you can see, a `Forth` is still a list of `Exp`s, but an `Exp` is like a
 cell in a compiled word, not an expression in a structured language.
 
 `Exp`s come in four flavors.
 
 `Push` is familiar - push a literal onto the stack.
 
-`ZeroBranch` is a bit like a branch to an address, but in Haskell the address
-metaphor doesn't work out very nicely. Instead of addressing the list of
+`ZeroBranch` is a bit like a branch to an address, but the address metaphor 
+doesn't work out very nicely in Haskell. Instead of addressing the list of 
 expressions, we're simply going to place it right inside the branch.
 
-Here's how the AST of the definition `: foo if 1 then 2 ;` will look like:
+Here's how the AST of the definition `: foo if 1 then 2 ;` will look:
 
     let rest = [ Push 2 ]
         word = [ ZeroBranch rest, Push 1 ] ++ rest
@@ -73,9 +73,9 @@ program to execute, right after the branch. In this example since the remainder
 of the program in both cases shared a definition (the `Push 2` part), it was
 shared.
 
-When executed `ZeroBranch` will check the top of the stack. If it's false, it
-will interpret only the nested AST, throwing away the AST that follows it, and
-if it's true, nothing will happen, and the execution will resume normally.
+When executed, `ZeroBranch` will check the top of the stack. If it is false, it
+will interpret only the nested AST, throwing away the AST that follows it. If
+if it iss true, nothing will happen, and normal execution will resume.
 
 A `Call` is quite like a `ZeroBranch`. Let's compile `: bar 1 foo 2 ;`:
 
@@ -87,14 +87,14 @@ are thrown away. In a call, both the AST inside the call, and the AST after it
 are kept around and executed in order.
 
 A `Prim` is a new beast. This is simply going to be an inlined function
-responsible for performing a built in operation. `Prim`s are the most
-bare-bones elements of our virtual machine.
+responsible for performing a builtin operation. `Prim`s are the most
+basic elements of our virtual machine.
 
 ==== New Types for the Evaluator
 
-Since we're moving away from a parsed model into an interpreted one, which
-sort of compiles itself, the evaluation and compilation are more tightly
-coupled than before.
+Since we're moving away from a parsed model to an interpreted one, which sort of
+compiles itself, the evaluation and compilation are more tightly coupled than 
+before.
 
 Our new interpretation model is stateful, and slightly different from before:
 
@@ -105,7 +105,7 @@ Our new interpretation model is stateful, and slightly different from before:
         , interpState   :: InterpState
         } deriving Show
 
-The two additional fields are the state, and the buffer. The buffer contains
+The two additional fields are the state and the buffer. The buffer contains
 characters from the last line the user punched in.
 
 The state is like a boolean:
@@ -132,13 +132,13 @@ it was compiled to:
 
 Now that the new types are all sorted out, let's see why we needed the changes.
 
-First of all, we've started reaching further than Haskell 98 defines.
+First of all, we've started going further than Haskell 98 defines.
 
-At the top of the file we're putting
+At the top of the file we're putting:
 
     {-# OPTIONS_GHC -fglasgow-exts #-}
 
-to enable the GHC extensions to the haskell standard. This is necessary for
+to enable the GHC extensions to the Haskell standard. This is necessary for
 various `Show` derivations.
 
 `Eval.hs` also has a shiny list of imports:
@@ -151,8 +151,8 @@ various `Show` derivations.
     import System.Console.Readline (readline)
 
 `isSpace` is used to split words, `toUpper` to make our forth system case
-insensitive, `find` is used to retrieve dictionary entries, `exitWith` from
-`System.Exit` is used in the `BYE` word, and `readline` allows the user to edit
+insensitive, `find` to retrieve dictionary entries, `exitWith` from
+`System.Exit` in the `BYE` word, and `readline` to allow the user to edit
 their text when typing it in.
 
 We'll see how these are used later in the file.
@@ -180,22 +180,22 @@ Our general case of `execute` is vaguely similar to the old `interpret`:
 
 However, `doExp` does not return a function that modifies the interpreter, it
 returns the actual interpreter, after modification. This is due to a monadic
-mess I got myself into, with `takeWord` and `fillBuffer` which we'll meet later
-on.
+mess I got myself into, with `takeWord` and `fillBuffer` (which we'll meet later
+on).
 
 I hope to make it a bit more elegant in the future, but for now it'll do.
 
-I skipped two definitions of `execute` which need to come before the general case,
-because they're more specific. Arguably can't be `doExps` since they control
-what recursion `interpret` will perform.
+I skipped two definitions of `execute` which need to come before the general 
+case, because they're more specific. They arguably can't be `doExps` since they 
+control what recursion `interpret` will perform.
 
     -- Forth CPS ;-)
     execute ((Call word):exps) = execute ((body word) ++ exps)
 
-As you can see reducing a call to word is just prepending the word's AST to the
-AST that relies on it's effects.
+As you can see, reducing a call to word just involves prepending the word's AST 
+to the AST that relies on its effects.
 
-This is both a bit like inlining (in the C sense), or continuation passing
+This is both a bit like inlining (in the C sense), and like continuation passing
 style without parameter passing. I think it's witty (we'll see if I regret this
 remark in a few days).
 
@@ -214,7 +214,7 @@ the top of the stack is equal to zero.
 interpreters, it returns a modified interpreter. This is due to complications
 in composing `takeWord` with the `:` word.
 
-Primitive resolution is it's simplest form:
+Primitive resolution is its simplest form:
 
     doExp (Prim fun) = fun
 
@@ -229,7 +229,7 @@ the stack, using `doStack`.
     applyStack f = \i -> i{ interpStack = f (interpStack i) }
 
 `applyStack` is the general stack modifying function thing. Applied to a
-function `f` It creates an anonymous function that applies `f` to the stack,
+function `f`, it creates an anonymous function that applies `f` to the stack,
 and returns an interpreter with the stack that `f` yields.
 
 It has a monadic counterpart:
@@ -243,11 +243,11 @@ It has a monadic counterpart:
 
 ==== Interactivity
 
-The interactivity of a forth system is rather simple. When there's no compiled
+The interaction of a forth system is rather simple. When there's no compiled
 code to execute, because the last word finished, the next word the user typed
 in is looked up and executed.
 
-If at some point a word switch the system to compilation semantics, words that
+If at some point a word switches the system to compilation semantics, words that
 are read are compiled into the word currently being defined, with the exception
 of immediate words which are executed.
 
@@ -269,9 +269,9 @@ and eventually invokes the correct behavior, based on the interpreter state.
                             ((lit,_):_) -> doLit lit
                     Just wordDef -> doWord wordDef
 
-It's body is really just `takeWord findWord`, but it has a locally defined
-function, `findWord`. As it's type signature implies, `findWord` takes a word
-as it's only parameter.
+Its body is really just `takeWord findWord`, but it has a locally defined
+function, `findWord`. As its type signature implies, `findWord` takes a word
+as its only parameter.
 
 `takeWord` takes a function, arranges for a word to be broken off the buffer
 (possibly refilling it by calling `readLine`), and then passes it down to the
@@ -298,13 +298,13 @@ Which means our function can be read as:
 
     \x -> (word ==) (name x)
 
-Since `.` is only getting two paramters.
+Since `.` is only getting two parameters.
 
 `(word ==)` reduces to a function that takes something, and sees if it's equal
 to `word`. Recall that `word` is the parameter that `findWord` got in the first
-place. Since `==` is autocurried, that's why it behaves that way. This is the
-last time i'll mention it, since I think I've exhausted all the confusing uses
-for autocurrying.
+place. Since `==` is auto curried, that's why it behaves that way. This is the
+last time I'll mention it, since I think I've exhausted all the confusing uses
+for auto-currying.
 
 `name` is just the data type accessor for the type `WordDef`, so if the name of
 the word in the dictionary is equal to the word `findWord` was handed, we are
@@ -313,9 +313,9 @@ happy.
 If we did not find such a word in the dictionary, `find` returns Nothing. When
 that is the `case` we try to interpret it as a literal.
 
-`reads` is a function appearantly used to implement `read`
+`reads` is a function apparently used to implement `read`.
 
-In `ghci` try doing `read "1"`. It parses the number out of the string. Its type signature is interesting:
+In `ghci`, try `read "1"`. It parses the number from the string. Its type signature is interesting:
 
     read "1" :: (Read a) => a
 
@@ -345,7 +345,7 @@ instances of `Integral`, and guess what `toInteger` functions they define:
 As we can see the class `Integral` has two instances, `Int`, and `Integer`.
 `Integer` is like an `Int` but has no bit limits, and will not overflow.
 
-Let's guess how their two instances might look like:
+Let's guess what their two instances might look like:
 
     instance Integral Integer where
         toInteger = id
@@ -361,7 +361,7 @@ In fact, `someKindOfCast` is probably simpler than we think:
     ...
 
 So all `toInteger` on `Int`s must do is use the data constructor S on it's
-param. The `#`, if you're curios, means to use unboxed types. Since the guts of
+param. The `#`, if you're curious, means to use unboxed types. Since the guts of
 `Integer` aren't exposed to the user, it allows it to be faster, without
 compromising safety.
 
@@ -370,7 +370,7 @@ I don't know which `toInteger` will be chosen for the coercion, but since both
 
 Eventually what `read` results in is an `Integer` parsed from a `String`.
 
-The only question is what if the string does not make sense an an integer?
+The only question is: what if the string does not make sense as an integer?
 
     Prelude> toInteger $ read "foo"
     *** Exception: Prelude.read: no parse
@@ -415,7 +415,7 @@ this is really compiled to
 so `case` is read as "try these patterns, and use the first one that matches".
 
 Hence, when `reads` returns the empty list, there is no match. We spew out an
-error saying "there's no such word" or somesuch, and then go back to nibbling
+error saying "there's no such word" or some such, and then go back to nibbling
 the buffer - that is processing the next word.
 
 When `reads` returns something, we pattern match a list containing a pair, and
@@ -550,7 +550,7 @@ the `ReaderT` aspect of our `Eval` monad work.
             Just line -> local (withBuf (map toUpper line)) cont
 
 `fillBuffer` uses `readline`, as exported by `System.Console.Readline`. This is
-a binding to the GNU readline library. It is the moral equivelent of `getLine`,
+a binding to the GNU readline library. It is the moral equivalent of `getLine`,
 but it allows the user to use normal sane command line editing semantics.
 
 The `"> "` is the prompt `readline` will use.
@@ -584,7 +584,7 @@ calls to `local`, that create functions which replace some field in an
 
     withState state = \i -> i{ interpState = state }
 
-Now that we're done with the interpretive logic, we have a few more auxillary
+Now that we're done with the interpretive logic, we have a few more auxiliary
 functions. There are the implementations of the primitives that we have to
 provide, and a function called `initInterp`, that creates an interpreter with a
 usable dictionary of words.
@@ -596,7 +596,7 @@ usable dictionary of words.
         , interpState  = Interpretation
         }
 
-`initialInterp` is really boring, all it contiains is some defaults.
+`initialInterp` is really boring, all it contains is some defaults.
 `initialDict` is a bit more interesting. It creates a dictionary full of words
 that are implemented with primitives.
 
@@ -763,7 +763,7 @@ The `=` comparison operator casts the `Bool` that `(=)` returns back to an
 `1`. We already know `toInteger` - it's there just to make the type `Literal`
 (a synonym for `Integer`) work out.
 
-Expand the many instances of `.` like we did before, it's a nice excercise:
+Expand the many instances of `.` like we did before, it's a nice exercise:
 
     stackPrim "=" = infixOp $ ((toInteger . fromEnum) .) . (==)
 

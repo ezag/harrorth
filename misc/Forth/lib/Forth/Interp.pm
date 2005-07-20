@@ -3,6 +3,8 @@ package Forth::Interp;
 use strict;
 use warnings;
 
+use Algorithm::Dependency::Objects::Ordered;
+
 sub STATE () { 0 }
 sub IP () { 1 }
 sub DICT_HEAD () { 2 }
@@ -37,7 +39,7 @@ sub new {
 				last EXEC;
 			}
 		},
-		"GET-LINE"	=> sub { $self->{buffer} = <> },
+		"GET-LINE"	=> sub { $self->set_buffer(scalar <>) },
 		"GET-WORD"	=> sub {
 			(my($word), $self->{buffer}) = split(/\s+/, $self->{buffer}, 2);
 			my @word = split //, $word;
@@ -192,7 +194,7 @@ sub new {
 				my $value = pop @{$self->{dstack}};
 				@{$self->{heap}}[$address, $address+1] = ($self->{prim_dict}{PUSH}, $value);
 		},
-		(map { $_ => eval 'sub { push @{$self->{dstack}}, (pop @{$self->{dstack}}) '. $_ .'(pop @{$self->{dstack}}) }' } qw(+ - * /)),
+		(map { $_ => eval 'sub { my $y = pop @{$self->{dstack}}; my $x = pop @{$self->{dstack}}; push @{$self->{dstack}}, $x '. $_ .' $y }' } qw(+ - * /)),
 	#);
 	#my %immediatePrims = (
 		"APPEND-TO-COMPILING"	=> sub {
@@ -238,45 +240,56 @@ sub new {
 	$self;
 }
 
+sub set_buffer {
+	my $self = shift;
+	$self->{buffer} = shift;
+}
+
 sub loop {
 	my $self = shift;
-	REDO: {
+	{
 		&{ $self->{prims}[$self->{prim_dict}{"GET-LINE"}] };
 		$_ = uc for $self->{buffer};
-
-		while ($self->{buffer} =~ /\S/) {
-			(my ($word), $self->{buffer}) = split /\s+/, $self->{buffer}, 2;
-
-			my $state = $self->{heap}[STATE];
-			my $lkup = $self->{prims}[$self->{prim_dict}{"SEARCH-WORDLIST"}];
-			
-			#warn "looping on buffer... nibbled $word, currently in state $state";
-		
-			if (my $found = &{ $lkup }($word)){
-				my $immediate = $self->{heap}[$found + 1];
-
-				if ($state && !$immediate){
-					#warn "compiling BSR $word ($found)";
-					push @{$self->{heap}}, $self->{prim_dict}{BSR}, $found;
-				} else {
-					$self->{heap}[IP] = $found + HEADER_SIZE;
-					$self->execute;
-				}
-			} elsif ($word =~ /(\d+)/){
-				if ($state) {
-					#warn "compiling literal $1 into stack";
-					push @{$self->{heap}}, $self->{prim_dict}{PUSH}, 0+$1;
-				} else {
-					push @{$self->{dstack}}, 0+$1;
-				}
-			} else {
-				warn "blah! $word is bullshit";
-				$self->{buffer} = "";
-			}
-
-			#warn "finished $word... arrived at state $self->{heap}[STATE]";
-		}
+		$self->run_buffer;
 		redo;
+	}
+}
+
+sub run_buffer {
+	my $self = shift;
+
+	while (($self->{buffer} ||='') =~ /\S/) {
+		$self->{buffer} =~ s/^\s*\(.*?\)\s*// and redo;
+		(my ($word), $self->{buffer}) = split /\s+/, $self->{buffer}, 2;
+
+		my $state = $self->{heap}[STATE];
+		my $lkup = $self->{prims}[$self->{prim_dict}{"SEARCH-WORDLIST"}];
+		
+		#warn "looping on buffer... nibbled $word, currently in state $state";
+	
+		if (my $found = &{ $lkup }($word)){
+			my $immediate = $self->{heap}[$found + 1];
+
+			if ($state && !$immediate){
+				#warn "compiling BSR $word ($found)";
+				push @{$self->{heap}}, $self->{prim_dict}{BSR}, $found;
+			} else {
+				$self->{heap}[IP] = $found + HEADER_SIZE;
+				$self->execute;
+			}
+		} elsif ($word =~ /(\d+)/){
+			if ($state) {
+				#warn "compiling literal $1 into stack";
+				push @{$self->{heap}}, $self->{prim_dict}{PUSH}, 0+$1;
+			} else {
+				push @{$self->{dstack}}, 0+$1;
+			}
+		} else {
+			warn "blah! $word is bullshit";
+			$self->{buffer} = "";
+		}
+
+		#warn "finished $word... arrived at state $self->{heap}[STATE]";
 	}
 }
 
@@ -292,14 +305,14 @@ sub execute {
 	}
 }
 
-my $i = Forth::Interp->new;
-
-$i->loop;
-
+my (@ordered, %bootstrap_words, %immediate);
 sub mkprelude {
 	my $self = shift;
-	use Algorithm::Dependency::Objects::Ordered;
-	my $prelude = <<PRELUDE;
+
+	unless (@ordered){
+		#warn "analyzing prelude interdependencies";
+		my $t = times;
+		my $prelude = <<PRELUDE;
 : REVEAL ; ( FIXME )
 : ' ; ( FIXME )
 
@@ -314,11 +327,6 @@ sub mkprelude {
 
 : SWAP
 	1 ROLL
-;
-
-: STRCMP
-	ROT
-
 ;
 
 : IF
@@ -427,53 +435,54 @@ sub mkprelude {
 : ? @ . ;
 PRELUDE
 
-	my (%bootstrap_words, %immediate);
-	
-	foreach my $def ($prelude =~ /:\s+(\S+.*?)(?=:|$)/sg) {
-		$def || next;
-		$def =~ s/\(.*?\)//gs;
-		my ($name, @def) = split /\s+/, $def;
-		my $immediate = 0;
-		while ($def[$#def] ne ";"){
-			$immediate ||= (pop @def eq "IMMEDIATE");
-		}
-		pop @def;
-		$bootstrap_words{$name} = \@def;
-		$immediate{$name} = $immediate;
-	}
-
-	{
-		package WordDep;
-		use overload '""' => "name";
 		
-		sub new {
-			my $pkg = shift;
-			bless {
-				name => shift,
-				depends => shift || [],
-			}, $pkg;
+		foreach my $def ($prelude =~ /:\s+(\S+.*?)(?=:|$)/sg) {
+			$def || next;
+			$def =~ s/\(.*?\)//gs;
+			my ($name, @def) = split /\s+/, $def;
+			my $immediate = 0;
+			while ($def[$#def] ne ";"){
+				$immediate ||= (pop @def eq "IMMEDIATE");
+			}
+			pop @def;
+			$bootstrap_words{$name} = \@def;
+			$immediate{$name} = $immediate;
 		}
-		sub name {
-			$_[0]{name}
+
+		{
+			package WordDep;
+			use overload '""' => "name";
+			
+			sub new {
+				my $pkg = shift;
+				bless {
+					name => shift,
+					depends => shift || [],
+				}, $pkg;
+			}
+			sub name {
+				$_[0]{name}
+			}
+			sub depends {
+				@{$_[0]{depends}}
+			}
 		}
-		sub depends {
-			@{$_[0]{depends}}
+
+		my %objs = map { $_ => WordDep->new($_) } keys %{$self->{prim_dict}}, keys %bootstrap_words;
+		foreach my $word (keys %bootstrap_words){
+			$objs{$word}{depends} = [ map { exists $objs{$_} ? $objs{$_} : () } @{$bootstrap_words{$word}} ];
 		}
+
+		my $prims = Set::Object->new(map { $objs{$_} } keys %{$self->{prim_dict}});
+		my $boot = Set::Object->new(map { $objs{$_} } keys %bootstrap_words);
+
+		my $d = Algorithm::Dependency::Objects::Ordered->new(
+			objects => $prims + $boot,
+			selected => $prims,
+		);
+		@ordered = map { $_->name } $d->schedule_all;
+		#warn "dependency resolution took " . (times()-$t);
 	}
-
-	my %objs = map { $_ => WordDep->new($_) } keys %{$self->{prim_dict}}, keys %bootstrap_words;
-	foreach my $word (keys %bootstrap_words){
-		$objs{$word}{depends} = [ map { exists $objs{$_} ? $objs{$_} : () } @{$bootstrap_words{$word}} ];
-	}
-
-	my $prims = Set::Object->new(map { $objs{$_} } keys %{$self->{prim_dict}});
-	my $boot = Set::Object->new(map { $objs{$_} } keys %bootstrap_words);
-
-	my $d = Algorithm::Dependency::Objects::Ordered->new(
-		objects => $prims + $boot,
-		selected => $prims,
-	);
-	my @ordered = map { $_->name } $d->schedule_all;
 
 	my $bsr = $self->{prim_dict}{BSR};
 	my $push = $self->{prim_dict}{PUSH};
@@ -481,6 +490,9 @@ PRELUDE
 	my $lkup = $self->{prims}[$self->{prim_dict}{"SEARCH-WORDLIST"}];
 	my $hdr = $self->{prims}[$self->{prim_dict}{HEADER}];
 
+	#warn "bootstrapping interpreter";
+	#my $t = times();
+	
 	foreach my $word (@ordered) {
 		#warn "bootstrapping $word";
 		my @def = @{$bootstrap_words{$word}};
@@ -510,6 +522,8 @@ PRELUDE
 			$exit,
 		);
 	}
+
+	#warn "bootstrap took " . (times - $t);
 }
 
 <<RUNLOOP;

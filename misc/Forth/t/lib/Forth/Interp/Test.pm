@@ -11,12 +11,30 @@ filters {
 package Forth::Interp::Test::Filter;
 use Test::Base::Filter -Base;
 
-use IPC::Run ();
 
 sub run_forth {
 	my $in = shift;
-	my $out = `gforth -e "$in bye"`;
-	$out;
+
+	my $backend = $ENV{FORTH_TEST_BACKEND} || "p5orth";
+
+	if ($backend eq "p5orth"){
+		require Forth::Interp;
+
+		local *STDOUT;
+		open STDOUT, ">", \(my $out = "");
+
+		my $i = Forth::Interp->new;
+		$i->set_buffer(uc($in));
+		$i->run_buffer;
+		
+		return $out;
+	} elsif ($backend eq "gforth"){
+		require IPC::Run;
+		
+		IPC::Run::run([ qw/gforth -e/, $in . " bye" ], ">", \(my $out)) or die "$!";
+
+		$out;
+	}
 }
 
 sub result_regex {

@@ -194,7 +194,7 @@ sub new {
 				my $value = pop @{$self->{dstack}};
 				@{$self->{heap}}[$address, $address+1] = ($self->{prim_dict}{PUSH}, $value);
 		},
-		(map { $_ => eval 'sub { my $y = pop @{$self->{dstack}}; my $x = pop @{$self->{dstack}}; push @{$self->{dstack}}, $x '. $_ .' $y }' } qw(+ - * /)),
+		(map { $_ => eval 'sub { use integer; my $y = pop @{$self->{dstack}}; my $x = pop @{$self->{dstack}}; push @{$self->{dstack}}, $x '. $_ .' $y }' } qw(+ - * /)),
 	#);
 	#my %immediatePrims = (
 		"APPEND-TO-COMPILING"	=> sub {

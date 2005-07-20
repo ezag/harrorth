@@ -22,3 +22,15 @@ __END__
 state on foo
 --- result: 1
 
+
+=== if and the stack
+--- forth: : moose if [ .s ] 5 then ;
+--- result: (\[|<.*?>)\s*(\d+\s+)+\]?
+
+
+=== the LITERAL word
+--- forth
+: four [ 2 2 + ] LITERAL ;
+four .
+--- result: 4
+

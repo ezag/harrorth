@@ -185,29 +185,44 @@ sub new {
 				warn "$word is not a word!";
 			}
 		},
-		"'"		=> sub {
-				(my($word), $self->{buffer}) = split /\s+/, $self->{buffer}, 2;
-				push @{$self->{dstack}}, &{ $self->{prims}[$self->{prim_dict}{"SEARCH-WORDLIST"}] }($word);
+		"'"	=> sub {
+			(my($word), $self->{buffer}) = split /\s+/, $self->{buffer}, 2;
+			push @{$self->{dstack}}, &{ $self->{prims}[$self->{prim_dict}{"SEARCH-WORDLIST"}] }($word);
 		},
 		"COMPILE-LITERAL-AT" => sub {
-				my $address = pop @{$self->{dstack}};
-				my $value = pop @{$self->{dstack}};
-				@{$self->{heap}}[$address, $address+1] = ($self->{prim_dict}{PUSH}, $value);
+			my $address = pop @{$self->{dstack}};
+			my $value = pop @{$self->{dstack}};
+			@{$self->{heap}}[$address, $address+1] = ($self->{prim_dict}{PUSH}, $value);
 		},
 		(map { $_ => eval 'sub { use integer; my $y = pop @{$self->{dstack}}; my $x = pop @{$self->{dstack}}; push @{$self->{dstack}}, $x '. $_ .' $y }' } qw(+ - * /)),
 	#);
 	#my %immediatePrims = (
 		"APPEND-TO-COMPILING"	=> sub {
-				my @def = @{$self->{heap}}[$self->{rstack}[-1]++, $self->{rstack}[-1]++];
-				# @def == (code of BSR, word to jump to)
-				push @{$self->{heap}}, @def;
+			my @def = @{$self->{heap}}[$self->{rstack}[-1]++, $self->{rstack}[-1]++];
+			# @def == (code of BSR, word to jump to)
+			push @{$self->{heap}}, @def;
 		},
 		"APPEND-PRIM-TO-COMPILING" => sub {
-				$self->{rstack}[-1]++;
-				my $def = $self->{heap}[$self->{rstack}[-1]++];
-				#warn "writing prim $self->{prim_name_by_code}[$self->{heap}[$def + HEADER_SIZE]] into cell " . scalar @{$self->{heap}};
-				push @{$self->{heap}}, $self->{heap}[$def + HEADER_SIZE];
+			$self->{rstack}[-1]++;
+			my $def = $self->{heap}[$self->{rstack}[-1]++];
+			#warn "writing prim $self->{prim_name_by_code}[$self->{heap}[$def + HEADER_SIZE]] into cell " . scalar @{$self->{heap}};
+			push @{$self->{heap}}, $self->{heap}[$def + HEADER_SIZE];
 		},
+		"COMPILE-PRIM-AT" => sub {
+			$self->{rstack}[-1]++;
+			my $def = $self->{heap}[$self->{rstack}[-1]++];
+			$self->{heap}[pop @{$self->{dstack}}] = $self->{heap}[$def + HEADER_SIZE];
+		},
+		"DOES'" => sub {
+			my $last_word = $self->{heap}[DICT_HEAD];
+			my $body_addr = $last_word + HEADER_SIZE;
+			$body_addr += 2; # push address
+
+			my $jump_to = $self->{rstack}[-1] + 1;
+
+			$self->{heap}[$body_addr++] = $self->{prim_dict}{JMP};
+			$self->{heap}[$body_addr] = $jump_to;
+		}
 	);
 
 	my %immediatePrims = ();
@@ -352,7 +367,10 @@ sub mkprelude {
 	IP ! (write the value on the data stack into the instruction pointer)
 ;
 : EXECUTE IP ! ; (EXECUTE is sort of like go to this continuation)
-: ; APPEND-PRIM-TO-COMPILING RET STATE OFF ; IMMEDIATE
+: ;
+	APPEND-PRIM-TO-COMPILING RET
+	STATE OFF
+; IMMEDIATE
 : :
 	GET-WORD
 	HEADER
@@ -378,32 +396,27 @@ sub mkprelude {
 : LITERAL COMPILE-LITERAL ; IMMEDIATE
 : , HERE CELL ALLOT ! ;
 : OP-SIZE CELL ;
+: CALL-SIZE OP-SIZE CELL + ;
 : COMPILE , ; ( a call to some code is just the intruction pointer to use )
 : COMPILE-VAR
-	HERE LITERAL-SIZE + OP-SIZE +
+	HERE LITERAL-SIZE + OP-SIZE + OP-SIZE +
 	COMPILE-LITERAL
+	APPEND-PRIM-TO-COMPILING RET
 	APPEND-PRIM-TO-COMPILING RET
 ;
 : DOES>
-	HERE
-	DUP OP-SIZE -
-	COMPILE-LITERAL-AT (overwrite the calll to 'exit' as created by 'COMPILE-VAR')
 	APPEND-TO-COMPILING DOES'
-	APPEND-PRIM-TO-COMPILING RET (don't execute code appearing after DOES>)
+	APPEND-PRIM-TO-COMPILING RET
 ; IMMEDIATE
-: DOES'
-	( in the word being written to, compile a literal containing )
-	LAST-BODY COMPILE-LITERAL
-	APPEND-PRIM-TO-COMPILING JMP
-;
+: STATE? STATE ? ; IMMEDIATE
 : LAST-BODY DICT-HEAD @ HEADER-SIZE + ;
 : OPEN-DICT-ENTRY
 	DICT-HEAD
 	DUP @ , (point the current entry to the old dict head)
 	HERE SWAP ! (set dictionary head to 'here')
 ;
-: DUP 0 PICK ;
-: OVER 1 PICK ;
+: DUP 1 PICK ;
+: OVER 2 PICK ;
 : HEADER-SIZE
 	[ 0
 	CELL + (linked list pointer)

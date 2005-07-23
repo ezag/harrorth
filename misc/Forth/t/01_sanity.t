@@ -19,6 +19,21 @@ __END__
 --- result: 4
 
 
+=== swap
+--- forth: 1 2 swap . .
+--- result: 1 \s+ 2
+
+
+=== over
+--- forth: 1 2 over . . .
+--- result: 1 \s+ 2 \s+ 1
+
+
+=== dup
+--- forth: 1 2 dup . . .
+--- result: 2 \s+ 2 \s+ 1
+
+
 === simple user word
 --- forth: : foo 7 ; foo .
 --- result: 7

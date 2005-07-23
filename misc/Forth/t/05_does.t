@@ -30,7 +30,7 @@ variable x
 x 1+!
 x ?
 
-: mk-n+! create , does> @ 1 pick @ + swap ! ;
+: mk-n+! create , does> @ over @ + swap ! ;
 
 1 mk-n+! one+!
 x one+!

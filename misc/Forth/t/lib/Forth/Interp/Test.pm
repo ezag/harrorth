@@ -4,6 +4,7 @@ package Forth::Interp::Test;
 use Test::Base -Base;
 
 filters {
+	skip => [qw/fudge_skip_list/],
 	forth => [qw/run_forth/],
 	result => [qw/result_regex/],
 };
@@ -11,13 +12,24 @@ filters {
 package Forth::Interp::Test::Filter;
 use Test::Base::Filter -Base;
 
+sub fudge_skip_list {
+	my @skip_backends = map { split /\s+/ } @_;
+	my $backend = $ENV{FORTH_TEST_BACKEND} || "p5orth";
+	if (grep { $_ eq $backend } @skip_backends){
+		"$backend is in skip list";
+	} else { return undef }
+}
 
 sub run_forth {
+	my @skip_backends = map { split /\s+/ } grep { defined } @{$self->current_block->{skip}};
+
 	my $in = shift;
 
 	my $backend = $ENV{FORTH_TEST_BACKEND} || "p5orth";
 
-	if ($backend eq "p5orth"){
+	if (grep { $_ eq "$backend" } @skip_backends){
+		return undef;
+	} elsif ($backend eq "p5orth"){
 		require Forth::Interp;
 
 		local *STDOUT;

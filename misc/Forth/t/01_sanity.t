@@ -84,3 +84,7 @@ __END__
 --- forth: 5 0 ?dup . .
 --- result: 0\s*5
 
+=== rot
+--- forth: 10 11 1 rot rot . . .
+--- result: 11\s*10\s*1
+

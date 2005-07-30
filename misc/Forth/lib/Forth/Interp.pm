@@ -159,24 +159,29 @@ sub new {
 					my $cell = $self->{heap}[$def++];
 					if ($cell == $self->{prim_dict}{"APPEND-TO-COMPILING"}){
 						print "APPEND-TO-COMPILING $self->{heap}[$def++] ";
-					}
-					if ($cell == $self->{prim_dict}{RET}){
+					} elsif ($cell == $self->{prim_dict}{TAIL}){
+						$def = $self->{heap}[$def];
+						print "(does:) ";
+						redo;
+					} elsif ($cell == $self->{prim_dict}{RET}){
 						print ";" . ($immediate ? " IMMEDIATE" : "") . "\n";
 						return;
-					} elsif($cell == $self->{prim_dict}{BSR}){
+					} elsif ($cell == $self->{prim_dict}{BSR}){
 						my $word = $self->{heap}[$def++];
 						my $str_ent = $word + 3;
 						my ($offset, $length) = @{$self->{heap}}[$str_ent, $str_ent + 1];
 						my $string = join("", @{$self->{heap}}[$offset .. (($offset + $length) - 1) ]);
 
-						print "<word $string> ";
+						#print "<word $string> ";
+						print "$string ";
 					} elsif ($cell == $self->{prim_dict}{PUSH}){
 						print "$self->{heap}[$def++] ";
 					} else {
 						if ($cell == $self->{prim_dict}{JMP} or $cell == $self->{prim_dict}{JNZ}){
 							print "<$self->{prim_name_by_code}[$cell] +" . (($self->{heap}[$def++] - $def) - 1) . "> ";
 						} else {
-							print "<prim $cell $self->{prim_name_by_code}[$cell]> ";
+							#print "<prim $cell $self->{prim_name_by_code}[$cell]> ";
+							print "$self->{prim_name_by_code}[$cell] "
 						}
 					}
 					redo;
@@ -195,8 +200,6 @@ sub new {
 			@{$self->{heap}}[$address, $address+1] = ($self->{prim_dict}{PUSH}, $value);
 		},
 		(map { $_ => eval 'sub { use integer; my $y = pop @{$self->{dstack}}; my $x = pop @{$self->{dstack}}; push @{$self->{dstack}}, $x '. $_ .' $y }' } qw(+ - * /)),
-	#);
-	#my %immediatePrims = (
 		"APPEND-TO-COMPILING"	=> sub {
 			my @def = @{$self->{heap}}[$self->{rstack}[-1]++, $self->{rstack}[-1]++];
 			# @def == (code of BSR, word to jump to)
@@ -220,10 +223,11 @@ sub new {
 
 			my $jump_to = $self->{rstack}[-1] + 1;
 
-			$self->{heap}[$body_addr++] = $self->{prim_dict}{JMP};
+			$self->{heap}[$body_addr++] = $self->{prim_dict}{TAIL};
 			$self->{heap}[$body_addr] = $jump_to;
 		}
 	);
+	$regPrims{TAIL} = $regPrims{JMP};
 
 	my %immediatePrims = ();
 	$_ = [ 0, $_ ] for values %regPrims;

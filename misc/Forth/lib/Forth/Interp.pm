@@ -40,13 +40,13 @@ sub new {
 			}
 		},
 		"GET-LINE"	=> sub { $self->set_buffer(scalar <>) },
-		"GET-WORD"	=> sub {
+		"GET-WORD"	=> sub { # FIXME refacor
 			(my($word), $self->{buffer}) = split(/\s+/, $self->{buffer}, 2);
 			my @word = split //, $word;
 			push @{$self->{dstack}}, scalar(@{$self->{heap}}), scalar(@word);
 			push @{$self->{heap}}, @word;
 		},
-		"HEADER"	=> sub {
+		"HEADER"	=> sub { # FIXME refacor
 			my $length = pop @{$self->{dstack}};
 			my $offset = pop @{$self->{dstack}};
 			my $addr = scalar @{$self->{heap}};
@@ -59,7 +59,7 @@ sub new {
 			);
 			$self->{heap}[DICT_HEAD] = $addr;
 		},
-		"WORDS" => sub {
+		"WORDS" => sub { # FIXME refacor
 			my $all_words;
 
 		   	$all_words = sub {
@@ -83,7 +83,7 @@ sub new {
 			local $, = ", ";
 			print @words;
 		},
-		"SEARCH-WORDLIST"	=> sub {
+		"SEARCH-WORDLIST"	=> sub { # FIXME refacor
 			my $string = shift; # can also be used internally
 			my $push;
 
@@ -108,12 +108,12 @@ sub new {
 
 			$push ? (push @{$self->{dstack}}, $dict) : $dict; # if it was found it's != 0
 		},
-		"HERE"		=> sub { push @{$self->{dstack}}, scalar @{$self->{heap}} },
+		"HERE"		=> sub { push @{$self->{dstack}}, scalar @{$self->{heap}} }, # FIXME refacor : HERE HERE-VAR @ ;
 		"ALLOT"		=> sub { push @{$self->{heap}}, (undef) x (pop @{$self->{dstack}}) },
-		"CELL"		=> sub { push @{$self->{dstack}}, 1 },
-		"STATE"		=> sub { push @{$self->{dstack}}, STATE },
-		"IP"		=> sub { push @{$self->{dstack}}, IP },
-		"DICT-HEAD"	=> sub { push @{$self->{dstack}}, 2 },
+		"CELL"		=> sub { push @{$self->{dstack}}, 1 }, # FIXME refacor constant
+		"STATE"		=> sub { push @{$self->{dstack}}, STATE }, # FIXME refacor constant
+		"IP"		=> sub { push @{$self->{dstack}}, IP }, # FIXME refacor constant
+		"DICT-HEAD"	=> sub { push @{$self->{dstack}}, 2 }, # FIXME refacor constant
 		"!"			=> sub {
 			my $address = pop @{$self->{dstack}};
 			my $value = pop @{$self->{dstack}};
@@ -121,13 +121,13 @@ sub new {
 			$self->{heap}[$address] = $value;
 		},
 		"@"			=> sub { push @{$self->{dstack}}, $self->{heap}[pop @{$self->{dstack}}] },
-		"THROW"		=> sub { @{$self->{rstack}} = (); $self->{heap}[IP] = 0 },
+		"THROW"		=> sub { @{$self->{rstack}} = (); $self->{heap}[IP] = 0 }, # FIXME refacor : THROW RCLEAR 0 IP ! ;
 		"PUSH"		=> sub { push @{$self->{dstack}}, $self->{heap}[$self->{heap}[IP]++] },
 		"PICK"		=> sub { my $howmany = pop @{$self->{dstack}}; push @{$self->{dstack}}, ${$self->{dstack}}[-$howmany] },
 		"ROLL"		=> sub { my $howmany = pop @{$self->{dstack}}; push @{$self->{dstack}}, splice(@{$self->{dstack}}, 0-($howmany+1), 1) },
 		"DROP"		=> sub { pop @{$self->{dstack}} },
 		"."			=> sub { print pop(@{$self->{dstack}}) . "\n" },
-		".S"		=> sub { print "[ @{$self->{dstack}} ]\n" },
+		".S"		=> sub { print "[ @{$self->{dstack}} ]\n" }, # FIXME refacor in terms of a loop and .
 		"BSR"		=> sub {
 			push @{$self->{rstack}}, 1 + $self->{heap}[IP];
 			my $addr = $self->{heap}[ $self->{heap}[IP] ];
@@ -143,7 +143,7 @@ sub new {
 			$self->{heap}[IP] = $self->{heap}[ $self->{heap}[IP]++ ];
 		},
 		"R>"		=> sub { push @{$self->{dstack}}, pop @{$self->{rstack}} },
-		"SEE"		=> sub {
+		"SEE"		=> sub { # FIXME refacor
 			(my($word), $self->{buffer}) = split /\s+/, $self->{buffer}, 2;
 			my $lkup = $self->{prims}[$self->{prim_dict}{"SEARCH-WORDLIST"}];
 			if (my $def = &{ $lkup }($word)){
@@ -190,33 +190,29 @@ sub new {
 				warn "$word is not a word!";
 			}
 		},
-		"'"	=> sub {
-			(my($word), $self->{buffer}) = split /\s+/, $self->{buffer}, 2;
-			push @{$self->{dstack}}, &{ $self->{prims}[$self->{prim_dict}{"SEARCH-WORDLIST"}] }($word);
-		},
 		"COMPILE-LITERAL-AT" => sub {
 			my $address = pop @{$self->{dstack}};
 			my $value = pop @{$self->{dstack}};
 			@{$self->{heap}}[$address, $address+1] = ($self->{prim_dict}{PUSH}, $value);
 		},
 		(map { $_ => eval 'sub { use integer; my $y = pop @{$self->{dstack}}; my $x = pop @{$self->{dstack}}; push @{$self->{dstack}}, $x '. $_ .' $y }' } qw(+ - * /)),
-		"APPEND-TO-COMPILING"	=> sub {
+		"APPEND-TO-COMPILING"	=> sub { # FIXME refacor
 			my @def = @{$self->{heap}}[$self->{rstack}[-1]++, $self->{rstack}[-1]++];
 			# @def == (code of BSR, word to jump to)
 			push @{$self->{heap}}, @def;
 		},
-		"APPEND-PRIM-TO-COMPILING" => sub {
+		"APPEND-PRIM-TO-COMPILING" => sub { # FIXME refacor in terms of compile prim at
 			$self->{rstack}[-1]++;
 			my $def = $self->{heap}[$self->{rstack}[-1]++];
 			#warn "writing prim $self->{prim_name_by_code}[$self->{heap}[$def + HEADER_SIZE]] into cell " . scalar @{$self->{heap}};
 			push @{$self->{heap}}, $self->{heap}[$def + HEADER_SIZE];
 		},
-		"COMPILE-PRIM-AT" => sub {
+		"COMPILE-PRIM-AT" => sub { # FIXME refacor, can use rstack
 			$self->{rstack}[-1]++;
 			my $def = $self->{heap}[$self->{rstack}[-1]++];
 			$self->{heap}[pop @{$self->{dstack}}] = $self->{heap}[$def + HEADER_SIZE];
 		},
-		"DOES'" => sub {
+		"DOES'" => sub { # FIXME refacor
 			my $last_word = $self->{heap}[DICT_HEAD];
 			my $body_addr = $last_word + HEADER_SIZE;
 			$body_addr += 2; # push address

@@ -416,8 +416,6 @@ sub mkprelude {
 	APPEND-TO-COMPILING DOES'
 	APPEND-PRIM-TO-COMPILING RET
 ; IMMEDIATE
-: STATE? STATE ? ; IMMEDIATE
-: LAST-BODY DICT-HEAD @ HEADER-SIZE + ;
 : OPEN-DICT-ENTRY
 	DICT-HEAD
 	DUP @ , (point the current entry to the old dict head)
@@ -425,15 +423,6 @@ sub mkprelude {
 ;
 : DUP 1 PICK ;
 : OVER 2 PICK ;
-: HEADER-SIZE
-	[ 0
-	CELL + (linked list pointer)
-	CELL + (immediate)
-	CELL + (compile only)
-	CELL + (string ptr)
-	CELL + (string length)
-	] LITERAL
-;
 : HEADER
 	OPEN-DICT-ENTRY
 	0 , (immediate?)
@@ -545,8 +534,26 @@ BOOTSTRAP
 	}
 
 	$self->set_buffer(<<PRELUDE);
+: STATE? STATE ? ; IMMEDIATE
+
+: HEADER-SIZE
+	[
+		0
+		CELL + (linked list pointer)
+		CELL + (immediate)
+		CELL + (compile only)
+		CELL + (string ptr)
+		CELL + (string length)
+	] LITERAL
+;
+
+: LAST-BODY DICT-HEAD @ HEADER-SIZE + ;
+
 : ?DUP DUP IF DUP THEN ;
 
+: RECURSIVE ; IMMEDIATE
+
+: RECURSE LAST-BODY COMPILE-LITERAL APPEND-TO-COMPILING EXECUTE ; IMMEDIATE
 PRELUDE
 	$self->run_buffer;
 }

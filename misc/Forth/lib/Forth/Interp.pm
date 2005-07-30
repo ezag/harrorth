@@ -66,7 +66,7 @@ sub new {
 				my $entry = shift || return ();
 
 				#warn "reading entry at $entry... $self->{heap}[$entry .. $entry+10]";
-				
+
 				my $next = $self->{heap}[$entry];
 				my $offset = $self->{heap}[$entry + 3];
 				my $length = $self->{heap}[$entry + 4];
@@ -86,7 +86,7 @@ sub new {
 		"SEARCH-WORDLIST"	=> sub {
 			my $string = shift; # can also be used internally
 			my $push;
-			
+
 			unless (defined $string){
 				$push = 1;
 				my $length = pop @{$self->{dstack}};
@@ -100,9 +100,9 @@ sub new {
 
 				my ($offset, $length) = @{$self->{heap}}[$str_ent, $str_ent + 1];
 				my $entStr = join("", @{$self->{heap}}[$offset .. (($offset + $length) - 1) ]);
-				
+
 				last if $entStr eq $string; # found
-				
+
 				$dict = $self->{heap}[$dict];
 			}
 
@@ -132,7 +132,7 @@ sub new {
 			push @{$self->{rstack}}, 1 + $self->{heap}[IP];
 			my $addr = $self->{heap}[ $self->{heap}[IP] ];
 			#warn "jumping to addr $addr (" . $self->string_at_addr($addr) . ")";
-			
+
 			$self->{heap}[IP] = HEADER_SIZE + $self->{heap}[ $self->{heap}[IP] ];
 		},
 		"JNZ"		=> sub {
@@ -283,9 +283,9 @@ sub run_buffer {
 
 		my $state = $self->{heap}[STATE];
 		my $lkup = $self->{prims}[$self->{prim_dict}{"SEARCH-WORDLIST"}];
-		
+
 		#warn "looping on buffer... nibbled $word, currently in state $state";
-	
+
 		if (my $found = &{ $lkup }($word)){
 			my $immediate = $self->{heap}[$found + 1];
 
@@ -445,7 +445,7 @@ sub mkprelude {
 : ? @ . ;
 BOOTSTRAP
 
-		
+
 		foreach my $def ($bootstrap =~ /:\s+(\S+.*?)(?=:|$)/sg) {
 			$def || next;
 			$def =~ s/\(.*?\)//gs;
@@ -462,7 +462,7 @@ BOOTSTRAP
 		{
 			package WordDep;
 			use overload '""' => "name";
-			
+
 			sub new {
 				my $pkg = shift;
 				bless {
@@ -502,7 +502,7 @@ BOOTSTRAP
 
 	#warn "bootstrapping interpreter";
 	#my $t = times();
-	
+
 	foreach my $word (@ordered) {
 		#warn "bootstrapping $word";
 		my @def = @{$bootstrap_words{$word}};
@@ -512,11 +512,11 @@ BOOTSTRAP
 		push @{$self->{heap}}, @word;
 
 		my $ent = @{$self->{heap}};
-		
+
 		&{ $hdr }();
 
 		@{$self->{heap}}[$ent+1, $ent+2] = ($immediate{$word}) x 2; # immediate, compile only
-		
+
 		push @{$self->{heap}}, my @compiled = (
 			(
 				map {
@@ -578,7 +578,7 @@ RUNLOOP
 sub string_at_addr {
 	my $self = shift;
 	my $entry = shift;
-	
+
 	my $offset = $self->{heap}[$entry + 3];
 	my $length = $self->{heap}[$entry + 4];
 

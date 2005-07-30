@@ -331,7 +331,7 @@ sub mkprelude {
 	unless (@ordered){
 		#warn "analyzing prelude interdependencies";
 		my $t = times;
-		my $prelude = <<PRELUDE;
+		my $bootstrap = <<BOOTSTRAP;
 : REVEAL ; ( FIXME )
 : ' ; ( FIXME )
 
@@ -378,6 +378,10 @@ sub mkprelude {
 : :
 	GET-WORD
 	HEADER
+	STATE ON
+;
+: :NONAME
+	HERE
 	STATE ON
 ;
 : [
@@ -450,10 +454,10 @@ sub mkprelude {
 : TRUE 1 ;
 : FALSE 0 ;
 : ? @ . ;
-PRELUDE
+BOOTSTRAP
 
 		
-		foreach my $def ($prelude =~ /:\s+(\S+.*?)(?=:|$)/sg) {
+		foreach my $def ($bootstrap =~ /:\s+(\S+.*?)(?=:|$)/sg) {
 			$def || next;
 			$def =~ s/\(.*?\)//gs;
 			my ($name, @def) = split /\s+/, $def;
@@ -540,7 +544,11 @@ PRELUDE
 		);
 	}
 
-	#warn "bootstrap took " . (times - $t);
+	$self->set_buffer(<<PRELUDE);
+: ?DUP DUP IF DUP THEN ;
+
+PRELUDE
+	$self->run_buffer;
 }
 
 <<RUNLOOP;

@@ -76,3 +76,11 @@ __END__
 0 foo .
 --- result: 10
 
+=== ?dup on true
+--- forth: 0 5 ?dup . .
+--- result: 5\s*5
+
+=== ?dup on false
+--- forth: 5 0 ?dup . .
+--- result: 0\s*5
+

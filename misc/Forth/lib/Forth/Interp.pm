@@ -142,7 +142,11 @@ sub new {
 		"JMP"		=> sub {
 			$self->{heap}[IP] = $self->{heap}[ $self->{heap}[IP]++ ];
 		},
+		# FIXME - all the R primitives are broken since they are wrapped in words
 		"R>"		=> sub { push @{$self->{dstack}}, pop @{$self->{rstack}} },
+		">R"		=> sub { push @{$self->{rstack}}, pop @{$self->{rstack}} },
+		"RDUP"		=> sub { push @{$self->{rstack}}, $self->{rstack}[-1] },
+		"R" 		=> sub { push @{$self->{dstack}}, $self->{rstack}[-2] },
 		"SEE"		=> sub { # FIXME refacor
 			(my($word), $self->{buffer}) = split /\s+/, $self->{buffer}, 2;
 			my $lkup = $self->{prims}[$self->{prim_dict}{"SEARCH-WORDLIST"}];
@@ -212,16 +216,6 @@ sub new {
 			my $def = $self->{heap}[$self->{rstack}[-1]++];
 			$self->{heap}[pop @{$self->{dstack}}] = $self->{heap}[$def + HEADER_SIZE];
 		},
-		"DOES'" => sub { # FIXME refacor
-			my $last_word = $self->{heap}[DICT_HEAD];
-			my $body_addr = $last_word + HEADER_SIZE;
-			$body_addr += 2; # push address
-
-			my $jump_to = $self->{rstack}[-1] + 1;
-
-			$self->{heap}[$body_addr++] = $self->{prim_dict}{TAIL};
-			$self->{heap}[$body_addr] = $jump_to;
-		}
 	);
 	$regPrims{TAIL} = $regPrims{JMP};
 
@@ -407,10 +401,6 @@ sub mkprelude {
 	APPEND-PRIM-TO-COMPILING RET
 	APPEND-PRIM-TO-COMPILING RET
 ;
-: DOES>
-	APPEND-TO-COMPILING DOES'
-	APPEND-PRIM-TO-COMPILING RET
-; IMMEDIATE
 : OPEN-DICT-ENTRY
 	DICT-HEAD
 	DUP @ , (point the current entry to the old dict head)
@@ -566,6 +556,22 @@ BOOTSTRAP
 
 : IS ' IS' ;
 : :DEFERRED ' HERE SWAP IS' STATE ON ;
+
+: DOES'
+	LAST-BODY ( the new word which is now only a variable)
+	LITERAL-SIZE + ( after the variable address is pushed )
+	DUP
+	COMPILE-PRIM-AT TAIL ( we replace the call to 'RET' with a call to 'TAIL' )
+	1 +
+
+	R 1 + ( the generic caller is compiled after the meta word's return op, that is the cell after our caller continuation )
+	SWAP !
+;
+
+: DOES>
+	APPEND-TO-COMPILING DOES'
+	APPEND-PRIM-TO-COMPILING RET
+; IMMEDIATE
 
 PRELUDE
 	$self->run_buffer;

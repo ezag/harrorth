@@ -135,7 +135,7 @@ sub new {
 
 			$self->{heap}[IP] = HEADER_SIZE + $self->{heap}[ $self->{heap}[IP] ];
 		},
-		"JNZ"		=> sub {
+		"JZ"		=> sub {
 			my $branch = $self->{heap}[ $self->{heap}[IP]++ ];
 			$self->{heap}[IP] = $branch if (pop @{$self->{dstack}} == 0);
 		},
@@ -181,7 +181,7 @@ sub new {
 					} elsif ($cell == $self->{prim_dict}{PUSH}){
 						print "$self->{heap}[$def++] ";
 					} else {
-						if ($cell == $self->{prim_dict}{JMP} or $cell == $self->{prim_dict}{JNZ}){
+						if ($cell == $self->{prim_dict}{JMP} or $cell == $self->{prim_dict}{JZ}){
 							print "<$self->{prim_name_by_code}[$cell] +" . (($self->{heap}[$def++] - $def) - 1) . "> ";
 						} else {
 							#print "<prim $cell $self->{prim_name_by_code}[$cell]> ";
@@ -338,7 +338,7 @@ sub mkprelude {
 ;
 
 : IF
-	APPEND-PRIM-TO-COMPILING JNZ
+	APPEND-PRIM-TO-COMPILING JZ
 	HERE
 	0 ,
 ; IMMEDIATE
@@ -524,7 +524,7 @@ BOOTSTRAP
 ; IMMEDIATE
 
 : UNTIL
-	APPEND-PRIM-TO-COMPILING JNZ
+	APPEND-PRIM-TO-COMPILING JZ
 	HERE !
 ; IMMEDIATE
 

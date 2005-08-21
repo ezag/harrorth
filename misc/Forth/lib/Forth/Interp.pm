@@ -123,7 +123,7 @@ sub new {
 		"@"			=> sub { push @{$self->{dstack}}, $self->{heap}[pop @{$self->{dstack}}] },
 		"THROW"		=> sub { @{$self->{rstack}} = (); $self->{heap}[IP] = 0 }, # FIXME refacor : THROW RCLEAR 0 IP ! ;
 		"PUSH"		=> sub { push @{$self->{dstack}}, $self->{heap}[$self->{heap}[IP]++] },
-		"PICK"		=> sub { my $howmany = pop @{$self->{dstack}}; push @{$self->{dstack}}, ${$self->{dstack}}[-$howmany] },
+		"PICK"		=> sub { my $howmany = pop @{$self->{dstack}}; push @{$self->{dstack}}, ${$self->{dstack}}[0-($howmany+1)] },
 		"ROLL"		=> sub { my $howmany = pop @{$self->{dstack}}; push @{$self->{dstack}}, splice(@{$self->{dstack}}, 0-($howmany+1), 1) },
 		"DROP"		=> sub { pop @{$self->{dstack}} },
 		"."			=> sub { print pop(@{$self->{dstack}}) . "\n" },
@@ -406,8 +406,8 @@ sub mkprelude {
 	DUP @ , (point the current entry to the old dict head)
 	HERE SWAP ! (set dictionary head to 'here')
 ;
-: DUP 1 PICK ;
-: OVER 2 PICK ;
+: DUP 0 PICK ;
+: OVER 1 PICK ;
 : HEADER
 	OPEN-DICT-ENTRY
 	0 , (immediate?)

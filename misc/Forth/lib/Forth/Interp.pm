@@ -128,6 +128,7 @@ sub new {
 		"DROP"		=> sub { pop @{$self->{dstack}} },
 		"."			=> sub { print pop(@{$self->{dstack}}) . "\n" },
 		".S"		=> sub { print "[ @{$self->{dstack}} ]\n" }, # FIXME refacor in terms of a loop and .
+		"R.S"		=> sub { print "[ @{$self->{rstack}} ]\n" }, # FIXME refacor in terms of a loop and .
 		"BSR"		=> sub {
 			push @{$self->{rstack}}, 1 + $self->{heap}[IP];
 			my $addr = $self->{heap}[ $self->{heap}[IP] ];

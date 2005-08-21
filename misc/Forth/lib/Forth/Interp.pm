@@ -528,6 +528,19 @@ BOOTSTRAP
 	HERE !
 ; IMMEDIATE
 
+: WHILE
+	APPEND-PRIM-TO-COMPILING JZ
+	HERE
+	0 ,
+; IMMEDIATE
+
+: REPEAT
+	APPEND-PRIM-TO-COMPILING JMP
+	SWAP , ( address of the WHILE is where we JMP to, as set by BEGIN )
+	HERE SWAP !  ( this is where WHILE JZs when false )
+;
+; IMMEDIATE
+
 : STATE? STATE ? ; IMMEDIATE
 
 : HEADER-SIZE

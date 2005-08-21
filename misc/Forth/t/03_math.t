@@ -35,3 +35,22 @@ __END__
 --- result: 3
 
 
+=== less than
+--- forth: 10 3 < .
+--- result: [0]
+
+
+=== less than
+--- forth: : true? if 1 else 0 then . ; 5 6 < true?
+--- result: 1
+
+
+=== greater than
+--- forth: 5 10 > .
+--- result: [0]
+
+
+=== less or equal
+--- forth: : true? if 1 else 0 then . ; 5 5 <= true?
+--- result: 1
+

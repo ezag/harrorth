@@ -199,7 +199,7 @@ sub new {
 			my $value = pop @{$self->{dstack}};
 			@{$self->{heap}}[$address, $address+1] = ($self->{prim_dict}{PUSH}, $value);
 		},
-		(map { $_ => eval 'sub { use integer; my $y = pop @{$self->{dstack}}; my $x = pop @{$self->{dstack}}; push @{$self->{dstack}}, $x '. $_ .' $y }' } qw(+ - * /)),
+		(map { $_ => eval 'sub { use integer; my $y = pop @{$self->{dstack}}; my $x = pop @{$self->{dstack}}; push @{$self->{dstack}}, 0+($x '. $_ .' $y )}' || die $@ } qw(+ - * / < > <= >=)),
 		"APPEND-TO-COMPILING"	=> sub { # FIXME refacor
 			my @def = @{$self->{heap}}[$self->{rstack}[-1]++, $self->{rstack}[-1]++];
 			# @def == (code of BSR, word to jump to)

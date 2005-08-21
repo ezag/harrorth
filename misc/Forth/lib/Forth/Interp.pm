@@ -549,7 +549,6 @@ BOOTSTRAP
 	APPEND-PRIM-TO-COMPILING JMP
 	SWAP , ( address of the WHILE is where we JMP to, as set by BEGIN )
 	HERE SWAP !  ( this is where WHILE JZs when false )
-;
 ; IMMEDIATE
 
 : STATE? STATE ? ; IMMEDIATE

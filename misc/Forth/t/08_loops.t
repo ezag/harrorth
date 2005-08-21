@@ -24,15 +24,29 @@ __END__
 === do/loop
 --- forth
 
-: REPEAT
+: REP
 	4 0 DO
 		DUP .
 	LOOP
 ;
 
-3 REPEAT
+3 REP
 
 --- result: 3 \s+ 3 \s+ 3 \s+ 3
+
+
+
+=== do/loop end case
+--- forth
+
+: REP
+	4 3 DO
+		DUP .
+	LOOP
+;
+
+3 REP
+--- result: 3
 
 
 

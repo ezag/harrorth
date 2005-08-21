@@ -324,6 +324,16 @@ sub mkprelude {
 		my $bootstrap = <<BOOTSTRAP;
 : REVEAL ; ( FIXME )
 
+: HEADER
+	HERE
+	DICT-HEAD @ , ( pointer to the previous word )
+	0 , ( immediate flag )
+	0 , ( compile only flag )
+	ROT ROT ( stash the pointer to this dictionary entry below the string pointers/length )
+	SWAP , , ( write the string for the name of the entry in a the logical order it's pushed on the stack )
+	DICT-HEAD ! (write old here into the dictionary pointer)
+;
+
 : COMPILE-LITERAL
 	HERE
 	COMPILE-LITERAL-AT

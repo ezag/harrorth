@@ -352,7 +352,7 @@ sub mkprelude {
 	HERE
 	SWAP
 	0 ,
-	THEN (close off the if)
+	HERE SWAP !
 ; IMMEDIATE
 
 : EXIT

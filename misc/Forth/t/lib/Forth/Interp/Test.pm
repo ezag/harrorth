@@ -36,7 +36,7 @@ sub run_forth {
 		open STDOUT, ">", \(my $out = "");
 
 		my $i = Forth::Interp->new;
-		$i->set_buffer(uc($in));
+		$i->set_buffer($in);
 		$i->run_buffer;
 		
 		return $out;

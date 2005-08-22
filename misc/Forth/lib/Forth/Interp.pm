@@ -3,6 +3,8 @@ package Forth::Interp;
 use strict;
 use warnings;
 
+$| = 1;
+
 use Algorithm::Dependency::Objects::Ordered;
 
 sub STATE () { 0 }
@@ -39,10 +41,23 @@ sub new {
 				last EXEC;
 			}
 		},
+		"IS-SPACE"	=> sub {
+			push @{$self->{dstack}}, (chr(pop @{$self->{dstack}}) =~ /\s/ ? 1 : 0);
+		},
+		"EMIT"	=> sub {
+			print STDOUT chr(pop @{$self->{dstack}});
+		},
+		"SEE-CHAR"	=> sub {
+			my $char = substr($self->{buffer}, 0, 1);
+			push @{$self->{dstack}}, ord($char);
+		},
+		"SKIP-CHAR"	=> sub {
+			substr($self->{buffer}, 0, 1, '');
+		},
 		"GET-LINE"	=> sub { $self->set_buffer(scalar <>) },
 		"GET-WORD"	=> sub { # FIXME refacor
 			(my($word), $self->{buffer}) = split(/\s+/, $self->{buffer}, 2);
-			my @word = split //, $word;
+			my @word = split //, uc($word);
 			push @{$self->{dstack}}, scalar(@{$self->{heap}}), scalar(@word);
 			push @{$self->{heap}}, @word;
 		},
@@ -93,6 +108,8 @@ sub new {
 				my $offset = pop @{$self->{dstack}};
 				$string = join("", @{$self->{heap}}[$offset .. (($offset + $length) - 1) ]);
 			}
+
+			$string = uc($string);
 
 			my $dict = $self->{heap}[DICT_HEAD];
 			while ($dict != 0){
@@ -200,7 +217,7 @@ sub new {
 			my $value = pop @{$self->{dstack}};
 			@{$self->{heap}}[$address, $address+1] = ($self->{prim_dict}{PUSH}, $value);
 		},
-		(map { $_ => eval 'sub { use integer; my $y = pop @{$self->{dstack}}; my $x = pop @{$self->{dstack}}; push @{$self->{dstack}}, 0+($x '. $_ .' $y )}' || die $@ } qw(+ - * / < > <= >=)),
+		(map { $_ => eval 'sub { use integer; my $y = pop @{$self->{dstack}}; my $x = pop @{$self->{dstack}}; push @{$self->{dstack}}, 0+($x '. $_ .' $y )}' || die $@ } qw(+ - * / < > <= >= ==)),
 		"APPEND-TO-COMPILING"	=> sub { # FIXME refacor
 			my @def = @{$self->{heap}}[$self->{rstack}[-1]++, $self->{rstack}[-1]++];
 			# @def == (code of BSR, word to jump to)
@@ -259,7 +276,6 @@ sub loop {
 	my $self = shift;
 	{
 		&{ $self->{prims}[$self->{prim_dict}{"GET-LINE"}] };
-		$_ = uc for $self->{buffer};
 		$self->run_buffer;
 		redo;
 	}
@@ -551,6 +567,8 @@ BOOTSTRAP
 	HERE SWAP !  ( this is where WHILE JZs when false )
 ; IMMEDIATE
 
+: NOT IF 0 ELSE 1 THEN ;
+
 : STATE? STATE ? ; IMMEDIATE
 
 : HEADER-SIZE
@@ -603,6 +621,70 @@ BOOTSTRAP
 : DOES>
 	APPEND-TO-COMPILING DOES'
 	APPEND-PRIM-TO-COMPILING RET
+; IMMEDIATE
+
+: SKIP-SPACE
+	BEGIN
+		SEE-CHAR IS-SPACE
+	WHILE
+		SKIP-CHAR
+	REPEAT
+;
+
+: READ-UNTIL
+	SKIP-SPACE
+	
+	HERE SWAP
+	BEGIN
+		SEE-CHAR OVER EXECUTE NOT
+	WHILE
+		SEE-CHAR ,
+		SKIP-CHAR
+	REPEAT
+
+	SKIP-CHAR (the delimiter is also dropped)
+	SKIP-SPACE
+
+	DROP ( the predicate )
+	
+	DUP HERE SWAP -
+;
+
+: TYPE
+	OVER OVER
+	BEGIN
+		DUP 0 >
+	WHILE
+		SWAP DUP @ EMIT
+		1 +
+		SWAP 1 -
+	REPEAT
+
+	DROP DROP
+;
+
+' IS-SPACE
+: READ-WORD
+	LITERAL
+	READ-UNTIL
+;
+
+: = == ;
+
+: EQ" 34 = ;
+
+' EQ"
+: S"
+	APPEND-PRIM-TO-COMPILING JMP
+	HERE
+	0 ,
+	LITERAL
+	READ-UNTIL
+	2 PICK HERE SWAP !
+	SWAP
+	COMPILE-LITERAL
+	COMPILE-LITERAL
+	DROP
 ; IMMEDIATE
 
 PRELUDE

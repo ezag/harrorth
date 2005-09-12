@@ -388,6 +388,7 @@ sub mkprelude {
 : EXIT R>DROP ;
 
 : EXECUTE IP ! ; (EXECUTE is sort of like go to this continuation)
+
 : ;
 	APPEND-PRIM-TO-COMPILING RET
 	STATE OFF
@@ -452,12 +453,14 @@ sub mkprelude {
 : IMMEDIATE-FLAG-OF-LAST-WORD
 	LAST-DICT-ENTRY IMMEDIATE-FLAG-OFFSET +
 ;
+
 : IMMEDIATE
 	IMMEDIATE-FLAG-OF-LAST-WORD ON
 ;
 : IMMEDIATE?
 	IMMEDIATE-FLAG-OFFSET + @
 ;
+
 : ON TRUE SWAP ! ;
 : OFF FALSE SWAP ! ;
 : TRUE 1 ;

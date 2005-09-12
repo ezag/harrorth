@@ -22,6 +22,7 @@ __END__
 
 
 === do/loop
+--- todo: p5orth
 --- forth
 
 : REP
@@ -37,6 +38,7 @@ __END__
 
 
 === do/loop end case
+--- todo: p5orth
 --- forth
 
 : REP
@@ -65,6 +67,5 @@ __END__
 ;
 
 4 SUM .
-
 --- result: 10
 

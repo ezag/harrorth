@@ -5,6 +5,7 @@ use Test::Base -Base;
 
 filters {
 	skip => [qw/fudge_skip_list/],
+	todo => [qw/fudge_skip_list/],
 	forth => [qw/run_forth/],
 	result => [qw/result_regex/],
 };
@@ -34,6 +35,8 @@ sub run_forth {
 
 		local *STDOUT;
 		open STDOUT, ">", \(my $out = "");
+		local *STDERR;
+		open STDERR, ">", \$out;
 
 		my $i = Forth::Interp->new;
 		$i->set_buffer($in);

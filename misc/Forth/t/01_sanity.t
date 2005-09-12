@@ -88,3 +88,10 @@ __END__
 --- forth: 10 11 1 rot rot . . .
 --- result: 11\s*10\s*1
 
+=== exit
+--- forth
+: foo 3 exit 4 ;
+: bar 2 foo 5 ;
+1 bar 6 . . . . .
+--- result: 6 \s* 5 \s* 3 \s* 2 \s* 1
+

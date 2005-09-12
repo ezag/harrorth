@@ -44,6 +44,9 @@ sub new {
 		"IS-SPACE"	=> sub {
 			push @{$self->{dstack}}, (chr(pop @{$self->{dstack}}) =~ /\s/ ? 1 : 0);
 		},
+		"IS-NUM" => sub {
+			push @{$self->{dstack}}, (chr(pop @{$self->{dstack}}) =~ /\d/ ? 1 : 0);
+		},
 		"EMIT"	=> sub {
 			print STDOUT chr(pop @{$self->{dstack}});
 		},
@@ -54,6 +57,7 @@ sub new {
 		"SKIP-CHAR"	=> sub {
 			substr($self->{buffer}, 0, 1, '');
 		},
+		"BUFFER-LENGTH" => sub { push @{$self->{dstack}}, length($self->{buffer} || '') },
 		"GET-LINE"	=> sub { $self->set_buffer(scalar <>) },
 		"GET-WORD"	=> sub { # FIXME refacor
 			(my($word), $self->{buffer}) = split(/\s+/, $self->{buffer}, 2);
@@ -554,6 +558,11 @@ BOOTSTRAP
 	HERE
 ; IMMEDIATE
 
+: INFLOOP
+	APPEND-PRIM-TO-COMPILING JMP
+	,
+; IMMEDIATE
+
 : UNTIL
 	APPEND-PRIM-TO-COMPILING JZ
 	HERE !
@@ -654,6 +663,8 @@ BOOTSTRAP
 	DUP HERE SWAP -
 ;
 
+: 2DROP DROP DROP ;
+
 : TYPE
 	OVER OVER
 	BEGIN
@@ -665,6 +676,16 @@ BOOTSTRAP
 	REPEAT
 
 	DROP DROP
+;
+
+: DEBUGGING FALSE ;
+: DEBUG
+	DEBUGGING IF
+		TYPE
+		.S
+	THEN
+
+	2DROP
 ;
 
 ' IS-SPACE
@@ -693,25 +714,87 @@ BOOTSTRAP
 	DROP
 ; IMMEDIATE
 
-PRELUDE
-	$self->run_buffer;
-}
+: NIP SWAP DROP ;
 
-<<RUNLOOP;
-: LOOP
-	PARSE-WORD FIND-WORD
-	DUP IMMEDIATE? NOT ( is the word regular? )
-	STATE @ ( what is the state? )
-	AND IF
-		,		( put the word pointer in our current word )
+: -ROT ROT ROT ;
+
+: TUCK SWAP OVER ;
+
+: MAYBE-FILL-BUFFER
+	BUFFER-LENGTH
+	S" BUFFER LENGTH IS " DEBUG
+
+	NOT
+
+	IF
+		S" getting another line" DEBUG
+		GET-LINE
 	ELSE
-		DUP COMPILE-ONLY? IF
-			THROW
-		THEN
+		S" enough data in the buffer" DEBUG
+	THEN
+;
+
+: NEXT-WORD
+	S" Stack at begining of nextword" DEBUG
+	BEGIN
+	S" Stack before maybe-fill-buffer is" DEBUG
+
+
+	MAYBE-FILL-BUFFER
+
+	S" stack before read+search is " DEBUG
+
+	GET-WORD
+	SEARCH-WORDLIST
+
+	DUP IF
+		EXIT
+	ELSE
+		S" naughty word (numbers not yet supported in this runloop)!" TYPE
+		DROP
+	THEN
+
+	INFLOOP
+;
+
+: REGULAR-WORD
+	DUP IMMEDIATE? NOT
+;
+
+: SHOULD-COMPILE-WORD?
+	REGULAR-WORD
+	S" IS THIS A REGULAR WORD?" DEBUG
+	STATE @
+	S" ARE WE COMPILING? " DEBUG
+	AND
+;
+
+
+: RUNWORD
+	NEXT-WORD
+	S" stack after next-word" DEBUG
+
+	SHOULD-COMPILE-WORD?
+	IF
+		S" COMPILING" DEBUG
+		,
+	ELSE
+		S" EXECUTING" DEBUG
+		HEADER-SIZE +
 		EXECUTE
 	THEN
 ;
-RUNLOOP
+
+: RUNLOOP
+	BEGIN
+	RUNWORD
+	INFLOOP
+;
+
+PRELUDE
+
+	$self->run_buffer;
+}
 
 
 sub string_at_addr {

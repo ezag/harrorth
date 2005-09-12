@@ -161,10 +161,9 @@ sub new {
 			$self->{heap}[IP] = $self->{heap}[ $self->{heap}[IP]++ ];
 		},
 		# FIXME - all the R primitives are broken since they are wrapped in words
-		"R>"		=> sub { push @{$self->{dstack}}, pop @{$self->{rstack}} },
-		">R"		=> sub { push @{$self->{rstack}}, pop @{$self->{rstack}} },
-		"RDUP"		=> sub { push @{$self->{rstack}}, $self->{rstack}[-1] },
-		"R" 		=> sub { push @{$self->{dstack}}, $self->{rstack}[-2] },
+		"R>DROP"	=> sub { splice(@{$self->{rstack}}, -2, 1) },
+		"R@"		=> sub { push @{$self->{dstack}}, $self->{rstack}[-2] },
+		"R>NIP"		=> sub { splice(@{$self->{rstack}}, -3, 1) },
 		"SEE"		=> sub { # FIXME refacor
 			(my($word), $self->{buffer}) = split /\s+/, $self->{buffer}, 2;
 			my $lkup = $self->{prims}[$self->{prim_dict}{"SEARCH-WORDLIST"}];
@@ -382,10 +381,8 @@ sub mkprelude {
 	HERE SWAP !
 ; IMMEDIATE
 
-: EXIT
-	R> (take the pointer to caller from the return stack)
-	IP ! (write the value on the data stack into the instruction pointer)
-;
+: EXIT R>DROP ;
+
 : EXECUTE IP ! ; (EXECUTE is sort of like go to this continuation)
 : ;
 	APPEND-PRIM-TO-COMPILING RET
@@ -614,7 +611,7 @@ BOOTSTRAP
 	COMPILE-PRIM-AT TAIL ( we replace the call to 'RET' with a call to 'TAIL' )
 	1 +
 
-	R 1 + ( the generic caller is compiled after the meta word's return op, that is the cell after our caller continuation )
+	R@ 1 + ( the generic caller is compiled after the meta word's return op, that is the cell after our caller continuation )
 	SWAP !
 ;
 

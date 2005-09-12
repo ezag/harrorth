@@ -57,4 +57,16 @@ __END__
 --- forth: : myrot 2 roll ; 5 3 2 myrot . . .
 --- result: 5 \s+ 2 \s+ 3
 
+=== -rot
+--- forth: 1 2 3 -rot . . .
+--- result: 2 \s+ 1 \s+ 3
+
+=== nip
+--- forth: 1 2 3 nip . .
+--- result: 3 \s+ 1
+
+=== tuck
+--- forth: 1 2 3 tuck . . . .
+--- result: 3 \s+ 2 \s+ 3 \s+ 1
+
 

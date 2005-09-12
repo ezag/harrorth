@@ -809,3 +809,5 @@ sub string_at_addr {
 
 	my $string = join("", @{$self->{heap}}[$offset .. (($offset + $length) - 1) ]);
 }
+
+1;
